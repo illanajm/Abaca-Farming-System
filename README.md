@@ -19,3 +19,5 @@ Run the following in your Command Line or Terminal in vscode
 when resetting database run "python reset_db.py" but be carefull for running this command means deleting also the data stored in db.
 
 to run the system type "streamlit run app.py"
+# Abaca-Farming-System
+Abaca Farming System is an AI solution about the current dilemma facing by PhilFida government in monitoring the abaca farmers data analytics and reports.
