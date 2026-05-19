@@ -1,7 +1,7 @@
 import streamlit as st
 from sqlalchemy import or_, func, cast, String
 from database import session, Farmer
-from datetime import date
+from datetime import date, datetime
 
 # =========================
 # PAGE CONFIG
@@ -263,7 +263,7 @@ def add_farmer_dialog():
         birthdate = st.date_input(
             "Birthdate",
             min_value=date(1900, 1, 1),
-            max_value=date.today()
+            max_value = date(date.today().year, 12, 31)
         )
 
         # =========================
@@ -389,7 +389,7 @@ def edit_farmer_dialog(farmer_id):
         birthdate = st.date_input(
             "Birthdate",
             min_value=date(1900, 1, 1),
-            max_value=date.today(),
+            max_value = date(date.today().year, 12, 31),
             value=date.fromisoformat(farmer.birthdate)
         )
 
@@ -506,6 +506,7 @@ def delete_farmer_dialog(farmer_id):
 def view_farmer_dialog(farmer_id):
 
     farmer = session.query(Farmer).filter_by(id=farmer_id).first()
+    birthdate = datetime.strptime(farmer.birthdate, "%Y-%m-%d")
 
     if not farmer:
         st.error("Farmer not found.")
@@ -515,7 +516,7 @@ def view_farmer_dialog(farmer_id):
 
     st.write(f"**Name:** {farmer.firstname} {farmer.middlename} {farmer.lastname}")
     st.write(f"**Sex:** {farmer.sex}")
-    st.write(f"**Birthdate:** {farmer.birthdate}")
+    st.write(f"**Birthdate:** {birthdate.strftime('%B %d, %Y')}")
     st.write(f"**Age:** {farmer.age}")
     st.write(f"**Civil Status:** {farmer.civil_status}")
 
@@ -721,9 +722,7 @@ with st.container(border=True):
             f"{farmer.sex}"
         )
 
-        c3.write(
-            f"{farmer.birthdate}"
-        )
+        c3.write(datetime.strptime(farmer.birthdate, "%Y-%m-%d").strftime("%B %d, %Y"))
 
         c4.write(
             f"{farmer.age}"
