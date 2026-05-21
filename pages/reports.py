@@ -113,19 +113,19 @@ st.markdown("""
    SIDEBAR
 ========================= */
 [data-testid="stSidebar"] {
-    background: linear-gradient(
-        white
-    );
+    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
     width: 270px;
     border-right: 2px solid #ffffff20;
 }
 
+/* Hide default nav */
 [data-testid="stSidebarNav"] {
     display: none;
 }
 
+/* Sidebar text */
 section[data-testid="stSidebar"] * {
-    color: black !important;
+    color: white !important;
 }
 
 /* Sidebar buttons */
@@ -217,7 +217,7 @@ with st.sidebar:
 col1, col2 = st.columns([8, 1.5])
 
 with col2:
-    with st.popover(f"Welcome back, {st.session_state.get('user', 'Farmer')}"):
+    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
 
         st.markdown("### Account")
 
@@ -399,7 +399,23 @@ with col1:
     st.markdown('<div class="section-box"><h4> Age Distribution</h4></div>', unsafe_allow_html=True)
 
     if not filtered_farmers.empty:
-        fig = px.histogram(filtered_farmers, x="Age", nbins=10)
+        fig = px.histogram(
+            filtered_farmers,
+            x="Age",
+            nbins=20,
+            color_discrete_sequence=["#4cb817"]  # dark green
+        )
+
+        fig.update_traces(
+            marker_line_width=0.1,   # border line
+            marker_line_color="#06402B"  # darker green outline
+        )
+
+        fig.update_layout(
+            bargap=0.1,  # controls bar width spacing (lower = thicker bars)
+            plot_bgcolor="white"
+        )
+
         st.plotly_chart(fig, use_container_width=True)
 
 with col2:
@@ -427,7 +443,11 @@ if not filtered_pests.empty:
     pest_count = filtered_pests["Pest Type"].value_counts().reset_index()
     pest_count.columns = ["Pest", "Count"]
 
-    fig = px.bar(pest_count, x="Pest", y="Count")
+    fig = px.bar(pest_count, x="Pest", y="Count", color_discrete_sequence=["#4cb817"]  # dark green
+        )
+    fig.update_traces(
+        width=0.5  # adjust bar width (0.3–0.8 best range)
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 # =========================

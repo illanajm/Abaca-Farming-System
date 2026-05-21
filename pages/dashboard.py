@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
+from sqlalchemy import func
 from database import (
     session,
     Farmer,
@@ -17,32 +19,27 @@ from analytics_engine import (
     generate_insights
 )
 
-# =========================
-# PAGE CONFIG
-# =========================
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="Dashboard",
+    page_title="Abaca Farming System",
     layout="wide"
 )
 
-# =========================
-# CUSTOM CSS
-# =========================
+# ---------------- CUSTOM CSS ----------------
 st.markdown("""
 <style>
-
-/* MAIN APP */
-.stApp {
-    background-color: #f4f6f9;
+.main {
+    background-color: black;
 }
-
+.stApp {
+    background-color: #f0f7f2;  /* clean dashboard gray */
+}
 /* =========================
    SIDEBAR
    ========================= */
 [data-testid="stSidebar"] {
-    background: linear-gradient(
-        white
-    );
+    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
+
     width: 270px;
     border-right: 2px solid #ffffff20;
 }
@@ -54,7 +51,7 @@ st.markdown("""
 
 /* Sidebar text */
 section[data-testid="stSidebar"] * {
-    color: black !important;
+    color: white !important;
 }
 
 /* Sidebar buttons */
@@ -66,23 +63,6 @@ section[data-testid="stSidebar"] * {
     border: 1px solid #ffffff30 !important;
     height: 45px;
     font-weight: 600;
-}
-
-.stButton > button {
-    background-color: transparent !important;
-    color: #006622 !important;
-    border: 1px solid #006622 !important;
-    border-radius: 8px !important;
-    height: 32px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
-}
-
-/* HOVER */
-.stButton > button:hover {
-    background-color: #006622 !important;
-    color: white !important;
 }
 
 /* =========================
@@ -109,78 +89,70 @@ section[data-testid="stSidebar"] * {
     text-align: center;
 }
 
-/* KPI CARD */
-.kpi-card {
-    background: white;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(0, 128, 0, 0.25);
-    padding: 18px;
-    border-radius: 15px;
-    color: #0b3d0b;
-    text-align: center;
-    box-shadow: 0 8px 25px rgba(0, 128, 0, 0.15);
+.stButton > button {
+    background-color: transparent !important;
+    color: #006622 !important;
+    border: 1px solid #006622 !important;
+    border-radius: 8px !important;
+    height: 32px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+}
+
+/* HOVER */
+.stButton > button:hover {
+    background-color: #006622 !important;
+    color: white !important;
+}
+
+.metric-card {
+    background-color: white;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 10px 10px rgba(0,0,0,0.06);
+}
+
+.metric-container {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.metric-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background-color: #e8f5e9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 35px;
+    color: #1b8f3a;
+}
+
+.metric-title {
+    color: #777;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.metric-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #111;
+}
+
+.section-title {
+    font-size: 22px;
+    font-weight: bold;
     margin-bottom: 10px;
 }
 
-.kpi-title {
-    font-size: 14px;
-    opacity: 0.9;
-}
-
-.kpi-value {
-    font-size: 30px;
-    font-weight: bold;
-}
-
-/* SECTION BOX */
-.section-box {
-    background: white;
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-}
-
-
-/* HEADER */
-.main-title {
-    color: #006622;
-    font-size: 40px;
-    font-weight: 800;
-    margin-bottom: 0;
-}
-
-.sub-title {
-    color: #666;
-    margin-top: 0;
-}
-
-.welcome-top-right {
-    position: absolute;
-    top: -35px;
-    right: 30px;
-    font-size: 16px;
-    color: #666;
-    font-weight: 500;
-    z-index: 999;
-}
 
 </style>
 """, unsafe_allow_html=True)
 
-# =========================
-# AUTH CHECK
-# =========================
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.warning("Please login first.")
-    st.switch_page("app.py")
-
-# =========================
-# SIDEBAR
-# =========================
 with st.sidebar:
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -233,19 +205,78 @@ with st.sidebar:
 
     st.markdown("---")
 
+
 # =========================
 # DATABASE COUNTS (REAL DATA)
 # =========================
 total_farmers = session.query(Farmer).count()
+
 total_farms = session.query(Farm).count()
+
+soil_quality_data = session.query(
+    Farm.soil_quality,
+    func.count(Farm.id).label("total")
+).group_by(Farm.soil_quality).all()
+
+soil_type_data = session.query(
+    Farm.soil_type,
+    func.count(Farm.id).label("total")
+).group_by(Farm.soil_type).all()
+
+total_farms_average_yield = session.query(
+    func.sum(Farm.average_yield)
+).scalar()
+
+total_barangays = session.query(
+    func.count(func.distinct(Farmer.barangay))
+).scalar() or 1   # avoid division by zero
+
+production_per_barangay = total_farms_average_yield / total_barangays
+
+production_by_barangay = session.query(
+    Farmer.barangay,
+    func.sum(Farm.average_yield).label("total_production")
+).join(Farm, Farmer.id == Farm.farmer_id)\
+ .group_by(Farmer.barangay)\
+ .all()
+
+overall_total_production = sum(item[1] or 0 for item in production_by_barangay)
+
 total_cultivation = session.query(AbacaCultivation).count()
+
+total_cultivation_area = session.query(func.sum(AbacaCultivation.abaca_area)).scalar()
+
 total_pests = session.query(PestManagement).count()
+
 total_soil = session.query(SoilManagement).count()
 
-col1, col2 = st.columns([8, 1.5])
+farmers = session.query(Farmer.age).all()
+
+irrigation_data = session.query(
+    Farm.irrigation_source,
+    func.count(Farm.farmer_id).label("total_farmers")
+).group_by(Farm.irrigation_source).all()
+
+production_by_year = session.query(
+    AbacaCultivation.year_first_planted,
+    func.sum(Farm.average_yield).label("total_production")
+).join(Farm, AbacaCultivation.farm_id == Farm.id)\
+ .group_by(AbacaCultivation.year_first_planted)\
+ .order_by(AbacaCultivation.year_first_planted)\
+ .all()
+
+# ---------------- HEADER ----------------
+col1, col2 = st.columns([9, 1])
+
+with col1:
+    st.markdown(
+        "<h4 style='margin-bottom:0px;'>Dashboard</h4>",
+        unsafe_allow_html=True
+    )
 
 with col2:
-    with st.popover(f"Welcome back, {st.session_state.get('user', 'Farmer')}"):
+
+    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
 
         st.markdown("### Account")
 
@@ -256,149 +287,262 @@ with col2:
             st.session_state.pop("user", None)
             st.switch_page("app.py")
 
-# =========================
-# KPI CARD FUNCTION
-# =========================
-def kpi_card(title, value):
+st.write("")
+
+# ---------------- TOP METRICS ----------------
+m1, m2, m3, m4 = st.columns(4)
+
+st.markdown("""
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+""", unsafe_allow_html=True)
+
+with m1:
     st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-title">{title}</div>
-        <div class="kpi-value">{value}</div>
+    <div class="metric-card">
+        <div class="metric-container">
+            <div class="metric-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div>
+                <div class="metric-title">Total Farmers</div>
+                <div class="metric-value">{total_farmers}</div>
+                Registered Farmers
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-# =========================
-# KPI ROW
-# =========================
-col1, col2, col3, col4, col5 = st.columns(5)
+with m2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-container">
+            <div class="metric-icon">
+                <i class="fas fa-seedling"></i>
+            </div>
+            <div>
+                <div class="metric-title">Total Area Cultivated</div>
+                <div class="metric-value">{total_cultivation_area:,.1f}</div>
+                Hectares
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col1:
-    kpi_card("Farmers", total_farmers)
+with m3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-container">
+            <div class="metric-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div>
+                <div class="metric-title">Average Yield</div>
+                <div class="metric-value">{total_farms_average_yield:,.1f}</div>
+                kg / year
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col2:
-    kpi_card("Farms", total_farms)
+with m4:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-container">
+            <div class="metric-icon">
+                <i class="fas fa-leaf"></i>
+            </div>
+            <div>
+                <div class="metric-title">Total Production</div>
+                <div class="metric-value">{overall_total_production:,.1f}</div>
+                kg / year
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col3:
-    kpi_card("Cultivation", total_cultivation)
+st.write("")
 
-with col4:
-    kpi_card("Pests", total_pests)
+# ---------------- CHART SECTION ----------------
+left, middle, right = st.columns([1.2, 1.2, 1])
 
-with col5:
-    kpi_card("Soil Records", total_soil)
-
-# =========================
-# DATA FOR CHART + TABLE
-# =========================
-chart_df = pd.DataFrame({
-    "Module": ["Farmers", "Farms", "Cultivation", "Pests", "Soil"],
-    "Records": [total_farmers, total_farms, total_cultivation, total_pests, total_soil]
-})
-
-# =========================
-# MAIN LAYOUT (LIKE IMAGE)
-# =========================
-left, right = st.columns([2, 1])
-
-# =========================
-# BAR CHART (LEFT)
-# =========================
+# ---------- PIE CHART ----------
 with left:
+    st.markdown("### Soil Quality Overview")
 
-    fig = go.Figure()
+    df_soil = pd.DataFrame(soil_quality_data, columns=["Soil Quality", "Count"])
 
-    fig.add_trace(go.Bar(
-        name="Records",
-        x=chart_df["Module"],
-        y=chart_df["Records"],
-        marker_color="#006622",
-        width=0.2
-    ))
+    # 🔥 convert to percentage
+    df_soil["Percent"] = (df_soil["Count"] / df_soil["Count"].sum()) * 100
 
-    fig.update_layout(
-        title="Abaca System Overview",
-        template="plotly_white",
-        height=450
+    fig = px.pie(
+        df_soil,
+        values="Percent",
+        names="Soil Quality",
+        color_discrete_sequence=[
+            "#1F7A8C",  # Excellent - dark green
+            "#0B6E4F",  # Good - ocean blue
+            "#B22222",  # Average - brown
+            "#C68642"   # Poor - red
+        ]
     )
+
+    fig.update_traces(textinfo="percent+label")
+
+    fig.update_layout(height=350)
 
     st.plotly_chart(fig, use_container_width=True)
 
-# =========================
-# TABLE (RIGHT)
-# =========================
+# ---------- DONUT CHART ----------
+with middle:
+    st.markdown("### Soil Type Distribution")
+
+    df_soil_type = pd.DataFrame(soil_type_data, columns=["Soil Type", "Count"])
+
+    # 🔥 convert to percentage
+    df_soil_type["Percent"] = (df_soil_type["Count"] / df_soil_type["Count"].sum()) * 100
+
+    fig2 = px.pie(
+        df_soil_type,
+        values="Percent",
+        names="Soil Type",
+        hole=0.4,
+        color_discrete_sequence=[
+            "#0B6E4F",  # dark green
+            "#8B5E3C",  # brown
+            "#1F7A8C"   # ocean blue
+        ]
+    )
+
+    fig2.update_traces(textinfo="percent+label")
+
+    fig2.update_layout(height=350)
+
+    # center plant symbol
+    fig2.add_annotation(
+        text="🌱",
+        x=0.5,
+        y=0.5,
+        font_size=40,
+        showarrow=False
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
+# ---------- IRRIGATION ----------
 with right:
+    st.markdown("### Irrigation Sources")
 
-    st.markdown("""
-    <div class="section-box">
-        <h4>Module Summary</h4>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # =========================
-    # PIE CHART
-    # =========================
-    import plotly.graph_objects as go
-
-    fig = go.Figure(data=[go.Pie(
-        labels=chart_df["Module"],
-        values=chart_df["Records"],
-        hole=0.4,  # donut style
-        textinfo="label+percent",
-        insidetextorientation="radial",
-        marker=dict(
-            colors=["#006622", "#1f6f4a", "#468767", "#2e8b57", "#3cb371"]
-        )
-    )])
-
-    # =========================
-    # LAYOUT
-    # =========================
-    fig.update_layout(
-        title="Module Distribution",
-        template="plotly_white",
-        height=360,
-        margin=dict(t=50, b=20, l=20, r=20)
+    df_irrigation = pd.DataFrame(
+        irrigation_data,
+        columns=["Irrigation Source", "Total Farmers"]
     )
 
-    # =========================
-    # DISPLAY
-    # =========================
-    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(
+        df_irrigation,
+        use_container_width=True,
+        hide_index=True
+    )
 
-# =========================
-# INSIGHTS SECTION
-# =========================
-st.markdown("##System Insights")
+st.write("")
 
-highest = chart_df.loc[chart_df["Records"].idxmax()]
-lowest = chart_df.loc[chart_df["Records"].idxmin()]
-total = chart_df["Records"].sum()
+# ---------------- SECOND ROW ----------------
+c1, c2, c3 = st.columns([1.2, 1.5, 1])
 
-col1, col2, col3 = st.columns(3)
+# ---------- TOP BARANGAYS ----------
+with c1:
+    st.markdown("### Top Producing Barangays")
 
-with col1:
-    st.markdown(f"""
-    <div class="section-box">
-        <h4>Highest Module</h4>
-        <h2>{highest['Module']}</h2>
-        <p>{highest['Records']} records</p>
-    </div>
-    """, unsafe_allow_html=True)
+    df_prod_barangay = pd.DataFrame(
+        production_by_barangay,
+        columns=["Barangay", "Total Production"]
+    )
 
-with col2:
-    st.markdown(f"""
-    <div class="section-box">
-        <h4>Lowest Module</h4>
-        <h2>{lowest['Module']}</h2>
-        <p>{lowest['Records']} records</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.dataframe(
+        df_prod_barangay,
+        use_container_width=True,
+        hide_index=True
+    )
 
-with col3:
-    st.markdown(f"""
-    <div class="section-box">
-        <h4>Total Records</h4>
-        <h2>{total}</h2>
-        <p>All system modules combined</p>
-    </div>
-    """, unsafe_allow_html=True)
+# ---------- AGE DISTRIBUTION ----------
+with c2:
+    st.markdown("### Age Distribution of Farmers")
+
+    age_groups = {
+        "20-30": 0,
+        "31-40": 0,
+        "41-50": 0,
+        "51-60": 0,
+        "61 above": 0
+    }
+
+    for (age,) in farmers:
+        if age is None:
+            continue
+
+        if 20 <= age <= 30:
+            age_groups["20-30"] += 1
+        elif 31 <= age <= 40:
+            age_groups["31-40"] += 1
+        elif 41 <= age <= 50:
+            age_groups["41-50"] += 1
+        elif 51 <= age <= 60:
+            age_groups["51-60"] += 1
+        elif age >= 61:
+            age_groups["61 above"] += 1
+
+    ages = pd.DataFrame({
+        "Age Group": list(age_groups.keys()),
+        "Farmers": list(age_groups.values())
+    })
+
+    fig3 = px.bar(
+        ages,
+        x="Age Group",
+        y="Farmers",
+        text="Farmers"
+    )
+
+    # BAR COLOR + WIDTH ADJUSTMENT
+    fig3.update_traces(
+        marker_color="#0B6E4F",  # dark green
+        width=0.5               # bar width (0.3–0.8 good range)
+    )
+
+    fig3.update_layout(
+        height=350,
+        xaxis_title="Age Group",
+        yaxis_title="Number of Farmers",
+        plot_bgcolor="white"
+    )
+
+    st.plotly_chart(fig3, use_container_width=True)
+
+with c3:
+    st.markdown("### Production Trend (kg)")
+
+    production = pd.DataFrame(
+        production_by_year,
+        columns=["Year", "Production"]
+    )
+
+    fig4 = px.line(
+        production,
+        x="Year",
+        y="Production",
+        markers=True
+    )
+
+    fig4.update_traces(
+        line_color="#0B6E4F",
+        marker_color="#0B6E4F"
+    )
+
+    fig4.update_layout(
+        height=320,
+        plot_bgcolor="white",
+        margin=dict(l=10, r=10, t=10, b=10),
+        xaxis_title="",
+        yaxis_title=""
+    )
+
+    st.plotly_chart(fig4, use_container_width=True)

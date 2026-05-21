@@ -36,9 +36,7 @@ st.markdown("""
    SIDEBAR
    ========================= */
 [data-testid="stSidebar"] {
-    background: linear-gradient(
-        white
-    );
+    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
     width: 270px;
     border-right: 2px solid #ffffff20;
 }
@@ -50,7 +48,7 @@ st.markdown("""
 
 /* Sidebar text */
 section[data-testid="stSidebar"] * {
-    color: black !important;
+    color: white !important;
 }
 
 /* Sidebar buttons */
@@ -553,7 +551,7 @@ with col1:
 
 with col2:
 
-    with st.popover(f"Welcome back, {st.session_state.get('user', 'Farmer')}"):
+    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
 
         st.markdown("### Account")
 
