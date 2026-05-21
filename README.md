@@ -1,5 +1,11 @@
 Abaca Farming System
 
+
+
+Abaca Farming System
+
+an AI solution about the current dilemma facing by PhilFida government in monitoring the abaca farmers data analytics and reports.
+
 Need to have in your PC/Laptops
 1. vscode
 2. xampp
