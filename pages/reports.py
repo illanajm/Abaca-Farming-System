@@ -778,16 +778,66 @@ def generate_pdf(corr, df_farms, df_pests, df_farmers):
 
 
 def generate_excel():
+
     output = BytesIO()
     wb = Workbook()
+
+    # =========================
+    # SHARED KPI VALUES (same as PDF)
+    # =========================
+    avg_yield = filtered_farms["Yield"].mean() if not filtered_farms.empty else 0
+    most_common_pest = (
+        filtered_pests["Pest Type"].mode()[0]
+        if not filtered_pests.empty else "N/A"
+    )
+
+    # =========================
+    # SUMMARY SHEET (MATCH PDF)
+    # =========================
     ws = wb.active
-    ws.title = "Summary"
+    ws.title = "Executive Summary"
 
     ws.append(["Metric", "Value"])
-    ws.append(["Farmers", len(filtered_farmers)])
-    ws.append(["Farms", len(filtered_farms)])
-    ws.append(["Avg Yield", avg_yield])
-    ws.append(["Pests", len(filtered_pests)])
+    ws.append(["Total Farmers", len(filtered_farmers)])
+    ws.append(["Total Farms", len(filtered_farms)])
+    ws.append(["Average Yield", round(avg_yield, 2)])
+    ws.append(["Most Common Pest", most_common_pest])
+
+    # =========================
+    # FARMERS (MATCH PDF TABLE)
+    # =========================
+    ws2 = wb.create_sheet("Farmer Demographics")
+    ws2.append(filtered_farmers.columns.tolist())
+
+    for row in filtered_farmers.values.tolist():
+        ws2.append(row)
+
+    # =========================
+    # FARMS (MATCH PDF ANALYSIS)
+    # =========================
+    ws3 = wb.create_sheet("Farm Data")
+    ws3.append(filtered_farms.columns.tolist())
+
+    for row in filtered_farms.values.tolist():
+        ws3.append(row)
+
+    # =========================
+    # PESTS (MATCH PDF INSIGHTS)
+    # =========================
+    ws4 = wb.create_sheet("Pest Data")
+    ws4.append(filtered_pests.columns.tolist())
+
+    for row in filtered_pests.values.tolist():
+        ws4.append(row)
+
+    # =========================
+    # CULTIVATION (OPTIONAL BUT MATCHES SYSTEM)
+    # =========================
+    ws5 = wb.create_sheet("Cultivation")
+    ws5.append(filtered_cultivation.columns.tolist())
+
+    for row in filtered_cultivation.values.tolist():
+        ws5.append(row)
 
     wb.save(output)
     output.seek(0)

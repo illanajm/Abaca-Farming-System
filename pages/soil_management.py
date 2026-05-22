@@ -1,6 +1,7 @@
 import streamlit as st
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from database import session, Farm, SoilManagement, Farmer
+import pandas as pd
 
 # =========================
 # PAGE CONFIG
@@ -157,6 +158,43 @@ input, textarea {
 /* ALERTS */
 [data-testid="stAlert"] {
     border-radius: 12px !important;
+}
+
+div[data-testid="stFileUploader"] small {
+    display: none !important;
+}
+
+div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
+    display: none !important;
+}
+
+/* Optional: remove extra spacing */
+div[data-testid="stFileUploader"] section {
+    padding: 0 !important;
+    border: none !important;
+    padding-top: 15px !important;
+}
+
+/* Tooltip on hover */
+div[data-testid="stFileUploader"] button {
+    background-color: #006622 !important;  /* GREEN */
+    color: white !important;
+}
+
+/* Hover tooltip */
+div[data-testid="stFileUploader"] button:hover::after {
+    content: "Upload Excel file (.xlsx) — Max 200MB";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #006622 !important;  /* GREEN */
+    color: white;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 9999;
 }
 
 </style>
@@ -393,7 +431,7 @@ with col2:
 # =========================
 # SEARCH + ADD
 # =========================
-search_col, action_col = st.columns([1, 0.2], gap="large")
+search_col, action_col, upload_col = st.columns([0.8, 0.1, 0.1], gap="small")
 
 with search_col:
 
@@ -419,6 +457,123 @@ with action_col:
 
     if st.button("Add Record"):
         add_soil_dialog()
+
+with upload_col:
+
+    uploaded_file = st.file_uploader(
+        "",
+        type=["xlsx"],
+        label_visibility="collapsed",
+        key="soil_management_upload"
+    )
+
+    # =========================
+    # STEP 1: READ FILE ONLY
+    # =========================
+    if uploaded_file is not None:
+
+        try:
+            df = pd.read_excel(uploaded_file)
+
+            # CLEAN HEADERS
+            df.columns = (
+                df.columns
+                .str.strip()
+                .str.lower()
+                .str.replace(" ", "_")
+                .str.replace("/", "_")
+                .str.replace("-", "_")
+            )
+
+            required_columns = [
+                "first_name", "middle_name", "last_name",
+                "soil_testing",
+                "testing_frequency",
+                "fertility_improvement",
+                "soil_conservation",
+                "conservation_techniques",
+                "seasonal_effects"
+            ]
+
+            missing = [c for c in required_columns if c not in df.columns]
+
+            if missing:
+                st.error(f"Missing columns: {missing}")
+                st.stop()
+
+            st.session_state.soil_df = df
+            st.success("File ready for import!")
+
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+
+    # =========================
+    # STEP 2: IMPORT BUTTON
+    # =========================
+        if st.button("Import Soil Records", key="import_soil_btn"):
+
+            df = st.session_state.soil_df
+
+            inserted = 0
+            skipped = 0
+            total = len(df)
+
+            progress = st.progress(0)
+            status = st.empty()
+
+            for i, row in df.iterrows():
+
+                try:
+                    status.text(f"Processing {i+1}/{total}...")
+
+                    fname = str(row["first_name"]).strip().lower()
+                    mname = str(row["middle_name"]).strip().lower()
+                    lname = str(row["last_name"]).strip().lower()
+
+                    # FIND FARMER
+                    farmer = session.query(Farmer).filter(
+                        func.lower(Farmer.firstname) == fname,
+                        func.lower(Farmer.lastname) == lname
+                    ).first()
+
+                    if not farmer:
+                        skipped += 1
+                        continue
+
+                    # FIND FARM (IMPORTANT: SoilManagement uses farm_id)
+                    farm = session.query(Farm).filter_by(
+                        farmer_id=farmer.id
+                    ).first()
+
+                    if not farm:
+                        skipped += 1
+                        continue
+
+                    soil = SoilManagement(
+                        farm_id=farm.id,
+                        soil_testing=row["soil_testing"],
+                        testing_frequency=row["testing_frequency"],
+                        fertility_improvement=row["fertility_improvement"],
+                        soil_conservation=row["soil_conservation"],
+                        conservation_techniques=row["conservation_techniques"],
+                        seasonal_effects=row["seasonal_effects"]
+                    )
+
+                    session.add(soil)
+                    inserted += 1
+
+                except Exception as e:
+                    skipped += 1
+                    st.warning(f"Row {i+1} skipped: {e}")
+
+                progress.progress((i + 1) / total)
+
+            session.commit()
+
+            st.success(f"Inserted: {inserted} | Skipped: {skipped}")
+
+            del st.session_state["soil_df"]
+            st.rerun()
 
 # =========================
 # FETCH DATA

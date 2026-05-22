@@ -1,6 +1,7 @@
 import streamlit as st
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from database import session, AbacaCultivation, PestManagement, Farm, Farmer
+import pandas as pd
 
 # =========================
 # PAGE CONFIG
@@ -143,6 +144,44 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #006622 !important;
     color: white !important;
 }
+
+div[data-testid="stFileUploader"] small {
+    display: none !important;
+}
+
+div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
+    display: none !important;
+}
+
+/* Optional: remove extra spacing */
+div[data-testid="stFileUploader"] section {
+    padding: 0 !important;
+    border: none !important;
+    padding-top: 1px !important;
+}
+
+/* Tooltip on hover */
+div[data-testid="stFileUploader"] button {
+    background-color: #006622 !important;  /* GREEN */
+    color: white !important;
+}
+
+/* Hover tooltip */
+div[data-testid="stFileUploader"] button:hover::after {
+    content: "Upload Excel file (.xlsx) — Max 200MB";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #006622 !important;  /* GREEN */
+    color: white;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 9999;
+}
+
 
 </style>
 """, unsafe_allow_html=True)
@@ -370,7 +409,7 @@ with col2:
 # =========================
 # SEARCH + ADD
 # =========================
-search_col, action_col = st.columns([1, 0.2], gap="large")
+search_col, action_col, upload_col = st.columns([0.8, 0.1, 0.1], gap="small")
 
 with search_col:
 
@@ -384,6 +423,148 @@ with action_col:
 
     if st.button("Add Record"):
         add_pest_dialog()
+
+with upload_col:
+
+    uploaded_file = st.file_uploader(
+        "",
+        type=["xlsx"],
+        label_visibility="collapsed",
+        key="pest_management_upload"
+    )
+
+    # =========================
+    # STEP 1: READ FILE ONLY
+    # =========================
+    if uploaded_file is not None:
+
+        try:
+            df = pd.read_excel(uploaded_file)
+
+            # CLEAN HEADERS
+            df.columns = (
+                df.columns
+                .str.strip()
+                .str.lower()
+                .str.replace(" ", "_")
+                .str.replace("/", "_")
+                .str.replace("-", "_")
+            )
+
+            # OPTIONAL rename (if Excel uses full names)
+            rename_map = {
+                "first_name": "firstname",
+                "middle_name": "middlename",
+                "last_name": "lastname",
+            }
+
+            df = df.rename(columns=rename_map)
+
+            # REQUIRED COLUMNS
+            required_columns = [
+                "firstname",
+                "lastname",
+                "pest_type",
+                "pest_impact",
+                "control_method",
+                "control_frequency"
+            ]
+
+            missing = [c for c in required_columns if c not in df.columns]
+
+            if missing:
+                st.error(f"Missing columns: {missing}")
+                st.stop()
+
+            st.session_state.pest_df = df
+            st.success("File ready for import!")
+
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+
+    # =========================
+    # STEP 2: IMPORT BUTTON
+    # =========================
+        if st.button("Import Pest Records", key="import_pest_btn"):
+
+            df = st.session_state.pest_df
+
+            inserted = 0
+            skipped = 0
+            total = len(df)
+
+            progress = st.progress(0)
+            status = st.empty()
+
+            for i, row in df.iterrows():
+
+                try:
+                    status.text(f"Processing {i+1}/{total}...")
+
+                    fname = str(row["firstname"]).strip()
+                    lname = str(row["lastname"]).strip()
+
+                    # =========================
+                    # FIND FARMER
+                    # =========================
+                    farmer = session.query(Farmer).filter(
+                        func.lower(Farmer.firstname) == fname.lower(),
+                        func.lower(Farmer.lastname) == lname.lower()
+                    ).first()
+
+                    if not farmer:
+                        skipped += 1
+                        continue
+
+                    # =========================
+                    # FIND FARM
+                    # =========================
+                    farm = session.query(Farm).filter_by(
+                        farmer_id=farmer.id
+                    ).first()
+
+                    if not farm:
+                        skipped += 1
+                        continue
+
+                    # =========================
+                    # FIND CULTIVATION
+                    # =========================
+                    cultivation = session.query(AbacaCultivation).filter_by(
+                        farm_id=farm.id
+                    ).first()
+
+                    if not cultivation:
+                        skipped += 1
+                        continue
+
+                    # =========================
+                    # INSERT PEST RECORD
+                    # =========================
+                    pest = PestManagement(
+                        abaca_id=cultivation.id,
+                        pest_type=str(row["pest_type"] or ""),
+                        pest_impact=str(row["pest_impact"] or ""),
+                        control_method=str(row["control_method"] or ""),
+                        control_frequency=str(row["control_frequency"] or "")
+                    )
+
+                    session.add(pest)
+                    inserted += 1
+
+                except Exception as e:
+                    skipped += 1
+                    st.warning(f"Row {i+1} skipped: {e}")
+
+                progress.progress((i + 1) / total)
+
+            session.commit()
+
+            st.success(f"Inserted: {inserted} | Skipped: {skipped}")
+
+            # RESET
+            del st.session_state["pest_df"]
+            st.rerun()
 
 # =========================
 # FETCH DATA

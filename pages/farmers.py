@@ -2,6 +2,7 @@ import streamlit as st
 from sqlalchemy import or_, func, cast, String
 from database import session, Farmer
 from datetime import date, datetime
+import pandas as pd
 
 # =========================
 # PAGE CONFIG
@@ -175,6 +176,42 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     z-index: 999;
 }
 
+div[data-testid="stFileUploader"] small {
+    display: none !important;
+}
+
+div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
+    display: none !important;
+}
+
+/* Optional: remove extra spacing */
+div[data-testid="stFileUploader"] section {
+    padding: 0 !important;
+    border: none !important;
+    padding-top: 15px !important;
+}
+
+/* Tooltip on hover */
+div[data-testid="stFileUploader"] button {
+    background-color: #006622 !important;  /* GREEN */
+    color: white !important;
+}
+
+/* Hover tooltip */
+div[data-testid="stFileUploader"] button:hover::after {
+    content: "Upload Excel file (.xlsx) — Max 200MB";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #006622 !important;  /* GREEN */
+    color: white;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 9999;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -566,7 +603,10 @@ with col2:
 # =========================
 # TABLE HEADER ACTIONS
 # =========================
-search_col, age_col, action_col = st.columns([1.2, 0.8, 0.3], gap="small")
+search_col, age_col, add_col, upload_col = st.columns(
+    [3, 4.4, 0.9, 0.8],
+    vertical_alignment="center"
+)
 
 with search_col:
     search = st.text_input(
@@ -596,13 +636,110 @@ with age_col:
             label_visibility="collapsed"
         )
 
-    if min_age > max_age:
-        st.error("Min Age cannot be greater than Max Age")
-        st.stop()
-
-with action_col:
+with add_col:
     if st.button("➕ Add Farmer"):
         add_farmer_dialog()
+
+with upload_col:
+    uploaded_file = st.file_uploader("", type=["xlsx"], label_visibility="collapsed", key="farmer_upload")
+
+    if uploaded_file is not None:
+
+        df = pd.read_excel(uploaded_file)
+
+        # =========================
+        # CLEAN HEADERS
+        # =========================
+        df.columns = (
+            df.columns
+            .str.strip()
+            .str.lower()
+            .str.replace(" ", "_")
+            .str.replace("/", "_")
+            .str.replace("-", "_")
+        )
+
+        # =========================
+        # MAP NAMES
+        # =========================
+        rename_map = {
+            "first_name": "firstname",
+            "middle_name": "middlename",
+            "last_name": "lastname",
+        }
+
+        df = df.rename(columns=rename_map)
+
+        required_columns = [
+            "firstname", "middlename", "lastname",
+            "sex", "birthdate", "civil_status",
+            "city_municipality", "barangay",
+            "years_in_farming", "farming_break",
+            "break_year_start", "break_year_end",
+            "reason_for_break"
+        ]
+
+        missing = [c for c in required_columns if c not in df.columns]
+
+        if missing:
+            st.error(f"Missing columns: {missing}")
+            st.stop()
+
+
+        if st.button("Import Farmers"):
+
+            inserted = 0
+            skipped = 0
+            total = len(df)
+
+            for i, row in df.iterrows():
+
+                try:
+                    birthdate = pd.to_datetime(row["birthdate"], errors="coerce")
+
+                    if pd.isna(birthdate):
+                        skipped += 1
+                        continue
+
+                    birthdate = birthdate.date()
+                    age = calculate_age(birthdate)
+
+                    # SAFE CONVERSIONS
+                    def safe_int(val):
+                        try:
+                            return int(val)
+                        except:
+                            return 0
+
+                    farmer = Farmer(
+                        firstname=str(row["firstname"]).strip(),
+                        middlename=str(row["middlename"]).strip(),
+                        lastname=str(row["lastname"]).strip(),
+                        sex=str(row["sex"]).strip(),
+                        birthdate=str(birthdate),
+                        age=age,
+                        civil_status=str(row["civil_status"]).strip(),
+                        city_municipality=str(row["city_municipality"]).strip(),
+                        barangay=str(row["barangay"]).strip(),
+                        years_in_farming=safe_int(row["years_in_farming"]),
+                        farming_break=safe_int(row["farming_break"]),
+                        break_year_start=safe_int(row["break_year_start"]),
+                        break_year_end=safe_int(row["break_year_end"]),
+                        reason_for_break=str(row["reason_for_break"] or "")
+                    )
+
+                    session.add(farmer)
+                    inserted += 1
+
+                except Exception as e:
+                    skipped += 1
+                    st.warning(f"Row {i+1} error: {e}")
+
+            # IMPORTANT: COMMIT OUTSIDE LOOP
+            session.commit()
+
+            st.success(f"Inserted: {inserted} | Skipped: {skipped}")
+            st.rerun()
 
 # =========================
 # FETCH DATA

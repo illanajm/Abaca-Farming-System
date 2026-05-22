@@ -1,4 +1,7 @@
 import streamlit as st
+import pandas as pd
+from sqlalchemy import or_, func, cast, String
+from datetime import datetime
 from database import session, Farmer, Farm
 
 # =========================
@@ -152,6 +155,44 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 .stButton > button:hover {
     background-color: #006622 !important;
     color: white !important;
+}
+
+div[data-testid="stFileUploader"] small {
+    display: none !important;
+}
+
+div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
+    display: none !important;
+}
+
+/* Optional: remove extra spacing */
+div[data-testid="stFileUploader"] section {
+    padding: 0 !important;
+    border: none !important;
+    padding-top: 15px !important;
+}
+
+/* Tooltip on hover */
+div[data-testid="stFileUploader"] button {
+    background-color: #006622 !important;  /* GREEN */
+    color: white !important;
+}
+
+/* Hover tooltip */
+div[data-testid="stFileUploader"] button:hover::after {
+    content: "Upload Excel file (.xlsx) — Max 200MB";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #006622 !important;  /* GREEN */
+    color: white;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 9999;
+}
 
 </style>
 """, unsafe_allow_html=True)
@@ -446,7 +487,7 @@ with col2:
 # =========================
 # TABLE ACTIONS
 # =========================
-search_col, action_col = st.columns([1, 0.2], gap="large")
+search_col, action_col, upload_col = st.columns([0.8, 0.1, 0.1], gap="small")
 
 with search_col:
 
@@ -471,6 +512,128 @@ with action_col:
 
     if st.button("Add Farm"):
         add_farm_dialog()
+
+with upload_col:
+
+    uploaded_file = st.file_uploader(
+        "",
+        type=["xlsx"],
+        label_visibility="collapsed",
+        key="farm_upload"
+    )
+
+    # =========================
+    # STEP 1: READ FILE ONLY
+    # =========================
+    if uploaded_file is not None:
+
+        try:
+            df = pd.read_excel(uploaded_file)
+
+            # CLEAN HEADERS
+            df.columns = (
+                df.columns
+                .str.strip()
+                .str.lower()
+                .str.replace(" ", "_")
+                .str.replace("/", "_")
+                .str.replace("-", "_")
+            )
+
+            rename_map = {
+                "first_name": "firstname",
+                "middle_name": "middlename",
+                "last_name": "lastname",
+            }
+
+            df = df.rename(columns=rename_map)
+
+            required_columns = [
+                "firstname", "lastname",
+                "farm_area",
+                "soil_quality",
+                "soil_type",
+                "irrigation_source",
+                "environmental_factors",
+                "access_to_inputs",
+                "input_source",
+                "average_yield"
+            ]
+
+            missing = [c for c in required_columns if c not in df.columns]
+
+            if missing:
+                st.error(f"Missing columns: {missing}")
+                st.stop()
+
+            st.session_state.farm_df = df
+            st.success("File ready for import!")
+
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+
+    # =========================
+    # STEP 2: IMPORT BUTTON
+    # =========================
+        if st.button("Import Farms", key="import_farms_btn"):
+
+            df = st.session_state.farm_df
+
+            inserted = 0
+            skipped = 0
+            total = len(df)
+
+            progress = st.progress(0)
+            status = st.empty()
+
+            for i, row in df.iterrows():
+
+                try:
+                    status.text(f"Processing {i+1}/{total}...")
+
+                    # SAFE CLEANING
+                    fname = str(row["firstname"]).strip()
+                    lname = str(row["lastname"]).strip()
+
+                    # FARMER LOOKUP (SAFE)
+                    farmer = session.query(Farmer).filter(
+                        func.lower(Farmer.firstname) == fname.lower(),
+                        func.lower(Farmer.lastname) == lname.lower()
+                    ).first()
+
+                    if not farmer:
+                        skipped += 1
+                        continue
+
+                    farm = Farm(
+                        farmer_id=farmer.id,
+                        farm_area=float(row["farm_area"] or 0),
+                        soil_quality=str(row["soil_quality"] or ""),
+                        soil_type=str(row["soil_type"] or ""),
+                        irrigation_source=str(row["irrigation_source"] or ""),
+                        environmental_factors=str(row["environmental_factors"] or ""),
+                        access_to_inputs=str(row["access_to_inputs"] or ""),
+                        input_source=str(row["input_source"] or ""),
+                        average_yield=float(row["average_yield"] or 0)
+                    )
+
+                    session.add(farm)
+                    inserted += 1
+
+                except Exception as e:
+                    skipped += 1
+                    st.warning(f"Row {i+1} skipped: {e}")
+
+                progress.progress((i + 1) / total)
+
+            session.commit()
+
+            st.success(f"Inserted: {inserted} | Skipped: {skipped}")
+
+            # RESET (IMPORTANT)
+            del st.session_state["farm_df"]
+
+            st.rerun()
 
 # =========================
 # FETCH DATA
