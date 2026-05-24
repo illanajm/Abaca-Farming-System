@@ -551,12 +551,12 @@ with upload_col:
 
                     soil = SoilManagement(
                         farm_id=farm.id,
-                        soil_testing=row["soil_testing"],
-                        testing_frequency=row["testing_frequency"],
-                        fertility_improvement=row["fertility_improvement"],
-                        soil_conservation=row["soil_conservation"],
-                        conservation_techniques=row["conservation_techniques"],
-                        seasonal_effects=row["seasonal_effects"]
+                        soil_testing=str(row["soil_testing"] or ""),
+                        testing_frequency=str(row["testing_frequency"] or ""),
+                        fertility_improvement=str(row["fertility_improvement"] or ""),
+                        soil_conservation=str(row["soil_conservation"] or ""),
+                        conservation_techniques=str(row["conservation_techniques"] or ""),
+                        seasonal_effects=str(row["seasonal_effects"] or "")
                     )
 
                     session.add(soil)

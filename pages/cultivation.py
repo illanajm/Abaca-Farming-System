@@ -267,9 +267,8 @@ def add_cultivation_dialog():
             format="%.2f"
         )
 
-        variety = st.selectbox(
-            "Variety",
-            ["Tanggongon", "Tinawagan Pula", "Linawaan", "Inosa", "La Filipe", "Bongolanon", "Enusa"]
+        variety = st.text_input (
+            "Variety"
         )
 
         planting_distance = st.text_input("Planting Distance (meters)")
@@ -340,12 +339,10 @@ def edit_cultivation_dialog(record_id):
 
     with st.form("edit_form"):
 
-        variety = st.selectbox(
+        variety = st.text_input (
             "Variety",
-            ["Tanggongon", "Tinawagan Pula", "Linawaan", "Inosa", "La Filipe", "Bongolanon", "Enusa"],
-            index=["Tanggongon", "Tinawagan Pula", "Linawaan", "Inosa", "La Filipe", "Bongolanon", "Enusa"].index(record.variety) if record.variety in ["Tanggongon", "Tinawagan Pula", "Linawaan", "Inosa", "La Filipe", "Bongolanon", "Enusa"] else 0
+            value=record.variety or ""
         )
-
         abaca_area = st.number_input(
             "Abaca Area",
             value=float(record.abaca_area)

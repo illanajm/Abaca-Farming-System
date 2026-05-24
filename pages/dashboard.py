@@ -225,7 +225,7 @@ soil_type_data = session.query(
 
 total_farms_average_yield = session.query(
     func.sum(Farm.average_yield)
-).scalar()
+).scalar() or 0
 
 total_barangays = session.query(
     func.count(func.distinct(Farmer.barangay))
@@ -244,7 +244,7 @@ overall_total_production = sum(item[1] or 0 for item in production_by_barangay)
 
 total_cultivation = session.query(AbacaCultivation).count()
 
-total_cultivation_area = session.query(func.sum(AbacaCultivation.abaca_area)).scalar()
+total_cultivation_area = session.query(func.sum(AbacaCultivation.abaca_area)).scalar() or 0
 
 total_pests = session.query(PestManagement).count()
 

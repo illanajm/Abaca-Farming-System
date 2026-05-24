@@ -258,34 +258,28 @@ def add_farm_dialog():
             min_value=0.0
         )
 
-        soil_quality = st.selectbox(
-            "Soil Quality",
-            ["Poor", "Average", "Good", "Excellent"]
+        soil_quality = st.text_input (
+            "Soil Quality"
         )
 
-        soil_type = st.selectbox(
-            "Soil Type",
-            ["Sandy", "Clay", "Silty", "Peaty", "Chalky", "Loam"]
+        soil_type = st.text_input (
+            "Soil Type"
+        )
+        
+        irrigation_source = st.text_input (
+            "Irrigation Source"
         )
 
-        irrigation_source = st.selectbox(
-            "Irrigation Source",
-            ["River", "Deep Well", "Rainfed", "Irrigation System", "Water Pump", "Water Trucking", "Saline Irrigation", "None"]
+        environmental_factors = st.text_input (
+            "Environment Factors"
         )
 
-        environmental_factors = st.selectbox(
-            "Environmental Factors",
-            ["Drought", "Flooding", "Pests", "Diseases", "Frost", "Heatwaves", "Typhoon", "Wind Exposure", "Soil Fertility", "Climate Change", "None"]
+        access_to_inputs = st.text_input (
+            "Access to Inputs"
         )
-
-        access_to_inputs = st.selectbox(
-            "Access to Inputs",
-            ["Accessible", "Limited", "None"]
-        )
-
-        input_source = st.selectbox(
-            "Input Source",
-            ["Local Market", "Cooperative", "Government Program", "Private Supplier", "Own Production", "Neighboring Farmers", "Loan/Credit", "Local Suppliers"]
+        
+        input_source = st.text_input (
+            "Input Source"
         )
 
         average_yield = st.number_input(
@@ -330,40 +324,34 @@ def edit_farm_dialog(farm_id):
             value=float(farm.farm_area or 0)
         )
 
-        soil_quality = st.selectbox(
+        soil_quality = st.text_input (
             "Soil Quality",
-            ["Poor", "Average", "Good", "Excellent"],
-            index=["Poor", "Average", "Good", "Excellent"].index(farm.soil_quality) if farm.soil_quality in ["Poor", "Average", "Good", "Excellent"] else 0
+            value=farm.soil_quality or ""
         )
-
-        soil_type = st.selectbox(
+        
+        soil_type = st.text_input(
             "Soil Type",
-            ["Sandy", "Clay", "Silty", "Peaty", "Chalky", "Loam"],
-            index=["Sandy", "Clay", "Silty", "Peaty", "Chalky", "Loam"].index(farm.soil_type) if farm.soil_type in ["Sandy", "Clay", "Silty", "Peaty", "Chalky", "Loam"] else 0
+            value=farm.soil_type or ""
         )
 
-        irrigation_source = st.selectbox(
+        irrigation_source = st.text_input (
             "Irrigation Source",
-            ["River", "Deep Well", "Rainfed", "Irrigation System", "Water Pump", "Water Trucking", "Saline Irrigation", "None"],
-            index=["River", "Deep Well", "Rainfed", "Irrigation System", "Water Pump", "Water Trucking", "Saline Irrigation", "None"].index(farm.irrigation_source) if farm.irrigation_source in ["River", "Deep Well", "Rainfed", "Irrigation System", "Water Pump", "Water Trucking", "Saline Irrigation", "None"] else 0
+            value=farm.irrigation_source or ""
         )
 
-        environmental_factors = st.selectbox(
-            "Environmental Factors",
-            ["Drought", "Flooding", "Pests", "Diseases", "Frost", "Heatwaves", "Typhoon", "Wind Exposure", "Soil Fertility", "Climate Change", "None"],
-            index=["Drought", "Flooding", "Pests", "Diseases", "Frost", "Heatwaves", "Typhoon", "Wind Exposure", "Soil Fertility", "Climate Change", "None"].index(farm.environmental_factors) if farm.environmental_factors in ["Drought", "Flooding", "Pests", "Diseases", "Frost", "Heatwaves", "Typhoon", "Wind Exposure", "Soil Fertility", "Climate Change", "None"] else 0
+        environmental_factors = st.text_input (
+            "Environment Factors",
+            value=farm.environmental_factors or ""
         )
 
-        access_to_inputs = st.selectbox(
+        access_to_inputs = st.text_input (
             "Access to Inputs",
-            ["Accessible", "Limited", "None"],
-            index=["Accessible", "Limited", "None"].index(farm.access_to_inputs) if farm.access_to_inputs in ["Accessible", "Limited", "None"] else 0
+            value=farm.access_to_inputs or ""
         )
 
-        input_source = st.selectbox(
+        input_source = st.text_input (
             "Input Source",
-            ["Local Market", "Cooperative", "Government Program", "Private Supplier", "Own Production", "Neighboring Farmers", "Loan/Credit", "Local Suppliers"],
-            index=["Local Market", "Cooperative", "Government Program", "Private Supplier", "Own Production", "Neighboring Farmers", "Loan/Credit", "Local Suppliers"].index(farm.input_source) if farm.input_source in ["Local Market", "Cooperative", "Government Program", "Private Supplier", "Own Production", "Neighboring Farmers", "Loan/Credit", "Local Suppliers"] else 0
+            value=farm.input_source or ""
         )
 
         average_yield = st.number_input(
