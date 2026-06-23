@@ -1,6 +1,9 @@
 import streamlit as st
+import bcrypt
 from datetime import date
-from database import User, session
+from database import User, session, UserRole
+from utils.ui import hide_streamlit_ui
+from auth import load_permissions
 
 # =========================
 # PAGE CONFIG
@@ -10,6 +13,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+hide_streamlit_ui()
 
 # =========================
 # GLOBAL STYLE
@@ -140,12 +145,32 @@ def register_user(data):
         st.error(f"Database error: {e}")
         return False
 
+def check_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'),
+        hashed_password.encode('utf-8')
+    )
 
 def login_user(username, password):
-    return session.query(User).filter_by(
-        username=username,
-        password=password
-    ).first()
+    user = (
+        session.query(User, UserRole)
+        .join(UserRole, User.role_id == UserRole.id)
+        .filter(User.username == username)
+        .first()
+    )
+
+    if not user:
+        return None
+
+    db_user, role = user
+
+    if not check_password(password, db_user.password):
+        return None
+
+    return {
+        "user": db_user,
+        "role": role
+    }
 
 # =========================
 # LOGIN PAGE
@@ -187,120 +212,24 @@ if st.session_state.page == "login":
                 use_container_width=True
             )
 
-            register_btn = st.form_submit_button(
-                "Create Account",
-                use_container_width=True
-            )
-
             if login_btn:
-                user = login_user(username, password)
+                result = login_user(username, password)
 
-                if user:
+                if result:
+                    db_user = result["user"]
+                    role = result["role"]
+
                     st.session_state.logged_in = True
-                    st.session_state.user = user.firstname
+                    st.session_state["user_id"] = db_user.id
+                    st.session_state["user"] = db_user.username
 
-                    st.success(f"Welcome {user.firstname}")
+                    st.session_state["role_id"] = role.id
+                    st.session_state["role_name"] = role.code
+
+                    load_permissions()
+
+                    st.success(f"Welcome {db_user.firstname}")
 
                     st.switch_page("pages/dashboard.py")
                 else:
                     st.error("Invalid credentials")
-
-            if register_btn:
-                st.session_state.page = "register"
-                st.rerun()
-
-# =========================
-# REGISTER PAGE
-# =========================
-else:
-
-    left, right = st.columns([1, 1])
-
-    # LEFT PANEL (GREEN)
-    with left:
-
-        st.image("public/logos/abaca_logo.png", width=500)
-
-        st.markdown("""
-            <div class="left-title">
-                ABACA FARMING SYSTEM
-            </div>
-        """, unsafe_allow_html=True)
-
-    # RIGHT PANEL (WHITE - REGISTER)
-    with right:
-
-        st.subheader("Create Account")
-
-        with st.form("register_form"):
-
-            firstname = st.text_input("First Name")
-            middlename = st.text_input("Middle Name")
-            lastname = st.text_input("Last Name")
-
-            username_reg = st.text_input("Username")
-
-            password_reg = st.text_input(
-                "Password",
-                type="password"
-            )
-
-            confirm = st.text_input(
-                "Confirm Password",
-                type="password"
-            )
-
-            create_btn = st.form_submit_button(
-                "Create Account",
-                use_container_width=True
-            )
-
-            back_btn = st.form_submit_button(
-                "Back to Login",
-                use_container_width=True
-            )
-
-            # =========================
-            # CREATE ACCOUNT
-            # =========================
-            if create_btn:
-
-                if password_reg != confirm:
-                    st.error("Passwords do not match")
-
-                elif (
-                    not firstname or
-                    not lastname or
-                    not username_reg or
-                    not password_reg
-                ):
-                    st.error("Please fill all required fields")
-
-                else:
-
-                    data = {
-                        "firstname": firstname,
-                        "middlename": middlename,
-                        "lastname": lastname,
-                        "username": username_reg,
-                        "password": password_reg
-                    }
-
-                    if register_user(data):
-
-                        st.success(
-                            "Account created successfully!"
-                        )
-
-                        st.session_state.page = "login"
-                        st.rerun()
-
-                    else:
-                        st.error("Username already exists")
-
-            # =========================
-            # BACK BUTTON
-            # =========================
-            if back_btn:
-                st.session_state.page = "login"
-                st.rerun()

@@ -2,13 +2,40 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from io import BytesIO
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
+from analytics_engine import generate_analysis_engine
+from report_engine.pdf_report import generate_pdf_report
+from report_engine.excel_report import generate_excel_report
 
 from database import (
     session,
     Farmer,
     Farm,
     AbacaCultivation,
-    PestManagement
+    PestManagement,
+    SoilManagement,
+    SoilQuality,
+    SoilType,
+    IrrigationSource,
+    EnvironmentalFactor,
+    AccessToInputs,
+    InputSource,
+    Variety,
+    PlantingMethod,
+    PlantingDistance,
+    IntercropCrops,
+    PestType,
+    PestImpact,
+    ControlMethod,
+    ControlFrequency,
+    SoilTesting,
+    TestingFrequency,
+    SoilConservation,
+    ConservationTechniques,
+    SeasonalEffects
 )
 
 from reportlab.platypus import (
@@ -17,14 +44,6 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle
-)
-
-from analytics_engine import (
-    descriptive_stats,
-    frequency_table,
-    correlation_analysis,
-    detect_outliers,
-    generate_insights
 )
 
 from reportlab.lib import colors
@@ -40,6 +59,11 @@ st.set_page_config(
     page_title="Analytics & Reports",
     layout="wide"
 )
+
+hide_streamlit_ui()
+render_sidebar() # Render custom sidebar with navigation links
+apply_global_css() # Apply global CSS for consistent styling
+render_header() # Render consistent header across pages
 
 # =========================
 # CUSTOM CSS (MODERN GREEN UI)
@@ -96,84 +120,6 @@ st.markdown("""
     margin-bottom: 15px;
 }
 
-/* BUTTON */
-.stButton > button {
-    background-color: #006622 !important;
-    color: white !important;
-    border-radius: 10px !important;
-    height: 42px !important;
-    font-weight: 600 !important;
-}
-
-.stButton > button:hover {
-    background-color: #009933 !important;
-}
-
-/* =========================
-   SIDEBAR
-========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
-    width: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* Sidebar buttons */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-.stButton > button {
-    background-color: transparent !important;
-    color: #006622 !important;
-    border: 1px solid #006622 !important;
-    border-radius: 8px !important;
-    height: 32px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
-}
-
-/* HOVER */
-.stButton > button:hover {
-    background-color: #006622 !important;
-    color: white !important;
-}
-
-/* =========================
-   LOGO AREA
-========================= */
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
-
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -183,50 +129,6 @@ section[data-testid="stSidebar"] * {
 if not st.session_state.get("logged_in"):
     st.warning("Please login first.")
     st.switch_page("app.py")
-
-# =========================
-# SIDEBAR
-# =========================
-with st.sidebar:
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
-
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
-
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    st.page_link("pages/dashboard.py", label="🏠 Dashboard")
-    st.page_link("pages/farmers.py", label="👨‍🌾 Farmers")
-    st.page_link("pages/farms.py", label="🌱 Farms")
-    st.page_link("pages/cultivation.py", label="🌾 Cultivation")
-    st.page_link("pages/pest_management.py", label="🐛 Pest Management")
-    st.page_link("pages/soil_management.py", label="🧪 Soil Management")
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
-
-col1, col2 = st.columns([8, 1.5])
-
-with col2:
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(f"User: {st.session_state.get('user', 'Farmer')}")
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
 
 # =========================
 # HEADER
@@ -251,7 +153,7 @@ pests = session.query(PestManagement).all()
 # =========================
 df_farmers = pd.DataFrame([{
     "farmer_id": f.id,
-    "Farmer": f"{f.firstname} {f.lastname}",
+    "Farmer": f"{f.firstname} {f.middlename} {f.lastname}",
     "Age": f.age,
     "Barangay": f.barangay,
     "Years Farming": f.years_in_farming
@@ -260,55 +162,235 @@ df_farmers = pd.DataFrame([{
 df_farms = pd.DataFrame([{
     "farm_id": f.id,
     "farmer_id": f.farmer_id,
+
+    "Farmer": (
+        f"{session.query(Farmer).filter_by(id=f.farmer_id).first().firstname} "
+        f"{session.query(Farmer).filter_by(id=f.farmer_id).first().middlename} "
+        f"{session.query(Farmer).filter_by(id=f.farmer_id).first().lastname}"
+        if session.query(Farmer).filter_by(id=f.farmer_id).first()
+        else None
+    ),
+
     "Farm Area": f.farm_area,
-    "Soil Type": f.soil_type,
+
+    "Soil Type": (
+        session.query(SoilType).filter_by(id=f.soil_type_id).first().description
+        if session.query(SoilType).filter_by(id=f.soil_type_id).first()
+        else None
+    ),
+
     "Yield": f.average_yield
 } for f in farms])
 
 df_cultivation = pd.DataFrame([{
     "abaca_id": c.id,
     "farm_id": c.farm_id,
-    "Variety": c.variety
+    "Variety": (
+        session.query(Variety)
+        .filter_by(id=c.variety_id)
+        .first().description
+        if session.query(Variety).filter_by(id=c.variety_id).first()
+        else None
+    )
 } for c in cultivations])
 
 df_pests = pd.DataFrame([{
     "abaca_id": p.abaca_id,
-    "Pest Type": p.pest_type
+    "Pest Type": (
+        session.query(PestType)
+        .filter_by(id=p.pest_type_id)
+        .first().description
+        if session.query(PestType).filter_by(id=p.pest_type_id).first()
+        else None
+    )
 } for p in pests])
+
+filter_df = (
+    df_farms[
+        ["farm_id", "farmer_id", "Farmer"]
+    ]
+    .merge(
+        df_farmers[
+            ["farmer_id", "Barangay", "Age"]
+        ],
+        on="farmer_id",
+        how="left"
+    )
+    .merge(
+        df_cultivation[
+            ["farm_id", "Variety"]
+        ],
+        on="farm_id",
+        how="left"
+    )
+)
 
 # =========================
 # FILTERS
 # =========================
 st.markdown("### Filters")
 
+# -------------------------
+# Session State
+# -------------------------
+if "selected_farmer" not in st.session_state:
+    st.session_state.selected_farmer = "All"
+
+if "selected_barangay" not in st.session_state:
+    st.session_state.selected_barangay = "All"
+
+if "selected_variety" not in st.session_state:
+    st.session_state.selected_variety = "All"
+
+# -------------------------
+# Age values
+# -------------------------
+min_age_default = 0
+max_age_default = 150
+
+# -------------------------
+# Determine dropdown values
+# -------------------------
+available_farmers = sorted(
+    df_farmers["Farmer"].dropna().unique()
+)
+
+available_barangays = sorted(
+    df_farmers["Barangay"].dropna().unique()
+)
+
+available_varieties = sorted(
+    df_cultivation["Variety"].dropna().unique()
+)
+
+disable_barangay = False
+disable_age = False
+
+# ======================================
+# FARMER SELECTED
+# ======================================
+if st.session_state.selected_farmer != "All":
+
+    disable_barangay = True
+    disable_age = True
+
+    farmer_info = filter_df[
+        filter_df["Farmer"]
+        == st.session_state.selected_farmer
+    ]
+
+    available_varieties = sorted(
+        farmer_info["Variety"]
+        .dropna()
+        .unique()
+    )
+
+# ======================================
+# BARANGAY SELECTED
+# ======================================
+elif st.session_state.selected_barangay != "All":
+
+    barangay_df = filter_df[
+        filter_df["Barangay"]
+        == st.session_state.selected_barangay
+    ]
+
+    age_min = st.session_state.get("min_age", 0)
+    age_max = st.session_state.get("max_age", 150)
+
+    barangay_df = barangay_df[
+        (barangay_df["Age"] >= age_min)
+        &
+        (barangay_df["Age"] <= age_max)
+    ]
+
+    available_farmers = sorted(
+        barangay_df["Farmer"]
+        .dropna()
+        .unique()
+    )
+
+    available_varieties = sorted(
+        barangay_df["Variety"]
+        .dropna()
+        .unique()
+    )
+
+# ======================================
+# VARIETY SELECTED
+# ======================================
+elif st.session_state.selected_variety != "All":
+
+    variety_df = filter_df[
+        filter_df["Variety"]
+        == st.session_state.selected_variety
+    ]
+
+    available_farmers = sorted(
+        variety_df["Farmer"]
+        .dropna()
+        .unique()
+    )
+
+    available_barangays = sorted(
+        variety_df["Barangay"]
+        .dropna()
+        .unique()
+    )
+
+# -------------------------
+# UI
+# -------------------------
+
 f1, f2, f3, f4 = st.columns([2, 2, 2, 2])
 
 with f1:
-    selected_farmer = st.selectbox("Farmer", ["All"] + df_farmers["Farmer"].dropna().unique().tolist())
+
+    selected_farmer = st.selectbox(
+        "Farmer",
+        ["All"] + list(available_farmers),
+        key="selected_farmer"
+    )
 
 with f2:
-    selected_barangay = st.selectbox("Barangay", ["All"] + df_farmers["Barangay"].dropna().unique().tolist())
+
+    selected_barangay = st.selectbox(
+        "Barangay",
+        ["All"] + list(available_barangays),
+        disabled=disable_barangay,
+        key="selected_barangay"
+    )
 
 with f3:
-    selected_variety = st.selectbox("Variety", ["All"] + df_cultivation["Variety"].dropna().unique().tolist())
+
+    selected_variety = st.selectbox(
+        "Variety",
+        ["All"] + list(available_varieties),
+        key="selected_variety"
+    )
 
 with f4:
+
     age_col1, age_col2 = st.columns(2)
 
     with age_col1:
+
         min_age = st.number_input(
             "Min Age",
             min_value=0,
             value=0,
-            step=1
+            disabled=disable_age,
+            key="min_age"
         )
 
     with age_col2:
+
         max_age = st.number_input(
             "Max Age",
             min_value=0,
             value=150,
-            step=1
+            disabled=disable_age,
+            key="max_age"
         )
 
 # =========================
@@ -450,418 +532,89 @@ if not filtered_pests.empty:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# =========================
-# DOWNLOAD FUNCTIONS (UNCHANGED)
-# =========================
-corr = correlation_analysis(df_farms, "Farm Area", "Yield")
-
-def generate_pdf(corr, df_farms, df_pests, df_farmers):
-
-
-    avg_yield = round(filtered_farms["Yield"].mean(), 2) if not filtered_farms.empty else 0
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer)
-
-    styles = getSampleStyleSheet()
-    elements = []
-
-    from reportlab.platypus import Image
-    from datetime import datetime
-    import numpy as np
-
-    # =========================
-    # COVER PAGE (ENTERPRISE STYLE)
-    # =========================
-    elements.append(
-        Paragraph(
-            "<b>ABACA FARMING MANAGEMENT SYSTEM</b>",
-            styles["Title"]
-        )
-    )
-
-    elements.append(Spacer(1, 10))
-
-    elements.append(
-        Paragraph(
-            "📊 EXECUTIVE ANALYTICS REPORT",
-            styles["Heading2"]
-        )
-    )
-
-    elements.append(Spacer(1, 10))
-
-    elements.append(
-        Paragraph(
-            f"Generated Date: {datetime.now().strftime('%B %d, %Y')}",
-            styles["Normal"]
-        )
-    )
-
-    elements.append(Spacer(1, 20))
-
-    # =========================
-    # EXECUTIVE SUMMARY
-    # =========================
-    elements.append(Paragraph(" Executive Summary", styles["Heading2"]))
-
-    avg_yield = round(filtered_farms["Yield"].mean(), 2) if not filtered_farms.empty else 0
-    most_common_pest = filtered_pests["Pest Type"].mode()[0] if not filtered_pests.empty else "N/A"
-
-    summary_text = f"""
-    This report provides an overview of abaca farming operations including farmers, farms, cultivation patterns,
-    and pest management activities.<br/><br/>
-
-    • Total Farmers: <b>{len(filtered_farmers)}</b><br/>
-    • Total Farms: <b>{len(filtered_farms)}</b><br/>
-    • Average Yield: <b>{avg_yield}</b><br/>
-    • Most Common Pest: <b>{most_common_pest}</b><br/><br/>
-
-    The data suggests opportunities for improving soil quality management and strengthening pest control strategies
-    to increase overall productivity.
-    """
-
-    elements.append(Paragraph(summary_text, styles["BodyText"]))
-    elements.append(Spacer(1, 20))
-
-    # =========================
-    # KPI TABLE
-    # =========================
-    elements.append(Paragraph(" Key Performance Indicators", styles["Heading2"]))
-
-    kpi_data = [
-        ["Metric", "Value"],
-        ["Farmers", len(filtered_farmers)],
-        ["Farms", len(filtered_farms)],
-        ["Average Yield", avg_yield],
-        ["Pest Incidents", len(filtered_pests)]
-    ]
-
-    kpi_table = Table(kpi_data, colWidths=[250, 250])
-
-    kpi_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#006622")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-        ("PADDING", (0, 0), (-1, -1), 8),
-    ]))
-
-    elements.append(kpi_table)
-    elements.append(Spacer(1, 20))
-
-    # =========================
-    # CHARTS SECTION
-    # =========================
-    elements.append(Paragraph(" Data Visualization", styles["Heading2"]))
-
-    if not filtered_farms.empty:
-
-        fig = px.scatter(
-            filtered_farms,
-            x="Farm Area",
-            y="Yield",
-            color="Soil Type",
-            title="Farm Area vs Yield"
-        )
-
-        img_bytes = fig.to_image(format="png")
-
-        img_buffer = BytesIO(img_bytes)
-
-        chart = Image(img_buffer, width=480, height=300)
-
-        elements.append(chart)
-
-    elements.append(Spacer(1, 20))
-
-    # =========================
-    # FARMER TABLE (CLEAN)
-    # =========================
-    elements.append(Paragraph(" Farmer Demographics", styles["Heading2"]))
-
-    if not filtered_farmers.empty:
-
-        farmer_table = Table(
-            [filtered_farmers.columns.tolist()] +
-            filtered_farmers.astype(str).values.tolist()
-        )
-
-        farmer_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#009933")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ]))
-
-        elements.append(farmer_table)
-
-    elements.append(Spacer(1, 20))
-
-    elements.append(Paragraph(" Advanced Statistical Analysis", styles["Heading2"]))
-
-    if not filtered_farms.empty:
-
-        farm_area = filtered_farms["Farm Area"]
-        yield_data = filtered_farms["Yield"]
-
-        def stats(x):
-            return {
-                "mean": round(x.mean(), 2),
-                "median": round(x.median(), 2),
-                "mode": x.mode()[0] if not x.mode().empty else 0,
-                "std": round(x.std(), 2),
-                "var": round(x.var(), 2),
-                "min": round(x.min(), 2),
-                "max": round(x.max(), 2),
-                "range": round(x.max() - x.min(), 2),
-                "cv": round((x.std() / x.mean()) * 100, 2) if x.mean() != 0 else 0
-            }
-
-        farm_stats = stats(farm_area)
-        yield_stats = stats(yield_data)
-
-        advanced_data = [
-            ["Metric", "Farm Area", "Yield"],
-
-            ["Mean", farm_stats["mean"], yield_stats["mean"]],
-            ["Median", farm_stats["median"], yield_stats["median"]],
-            ["Mode", farm_stats["mode"], yield_stats["mode"]],
-
-            ["Std Deviation", farm_stats["std"], yield_stats["std"]],
-            ["Variance", farm_stats["var"], yield_stats["var"]],
-
-            ["Min", farm_stats["min"], yield_stats["min"]],
-            ["Max", farm_stats["max"], yield_stats["max"]],
-
-            ["Range", farm_stats["range"], yield_stats["range"]],
-            ["Coefficient of Variation (%)", farm_stats["cv"], yield_stats["cv"]],
-        ]
-
-        adv_table = Table(advanced_data, colWidths=[180, 180, 180])
-
-        adv_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#006622")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ]))
-
-        elements.append(adv_table)
-
-        # =========================
-        # INTERPRETATION (AI-LIKE INSIGHT)
-        # =========================
-
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph(" Interpretation", styles["Heading3"]))
-
-        interpretation = ""
-
-        if farm_stats["cv"] < 10:
-            interpretation += "• Farm data is highly consistent (low variability).<br/>"
-        elif farm_stats["cv"] < 30:
-            interpretation += "• Farm data shows moderate variability.<br/>"
-        else:
-            interpretation += "• Farm data is highly variable (unstable farm sizes).<br/>"
-
-        if yield_stats["mean"] > farm_stats["mean"]:
-            interpretation += "• Yield performance is strong relative to farm size.<br/>"
-        else:
-            interpretation += "• Yield efficiency may need improvement.<br/>"
-
-        if yield_stats["std"] > yield_stats["mean"] * 0.5:
-            interpretation += "• Yield is unstable and inconsistent across farms.<br/>"
-
-        elements.append(
-            Paragraph(interpretation, styles["BodyText"])
-        )
-
-    else:
-        elements.append(
-            Paragraph("No sufficient data for advanced analysis.", styles["BodyText"])
-        )
-
-    elements.append(Spacer(1, 20))
-
-    # =========================
-    # INSIGHTS SECTION
-    # =========================
-    elements.append(Paragraph(" Insights & Recommendations", styles["Heading2"]))
-
-    insights_list = []
-
-    # =========================
-    # MOST COMMON PEST
-    # =========================
-    if not df_pests.empty:
-        most_common_pest = df_pests["Pest Type"].mode()[0]
-
-        insights_list.append(
-            f"Monitor '{most_common_pest}' as it is the most frequently occurring pest in the system."
-        )
-
-    # =========================
-    # YIELD PERFORMANCE
-    # =========================
-    if not df_farms.empty:
-        avg_yield = df_farms["Yield"].mean()
-        std_yield = df_farms["Yield"].std()
-
-        if std_yield > avg_yield * 0.3:
-            insights_list.append(
-                "Yield variation is high across farms. Standardize farming practices to improve consistency."
-            )
-        else:
-            insights_list.append(
-                "Yield levels are relatively stable across farms."
-            )
-
-    # =========================
-    # FARM SIZE vs YIELD RELATIONSHIP
-    # =========================
-    if corr is not None:
-        if corr > 0.6:
-            insights_list.append(
-                "Strong positive relationship between farm size and yield. Larger farms tend to be more productive."
-            )
-        elif corr > 0.3:
-            insights_list.append(
-                "Moderate relationship between farm size and yield."
-            )
-        else:
-            insights_list.append(
-                "Weak relationship between farm size and yield. Farm size is not a strong predictor of yield."
-            )
-
-    # =========================
-    # SOIL / GENERAL RECOMMENDATION (DATA-BASED RULE)
-    # =========================
-    if not df_farms.empty:
-        low_yield_ratio = (df_farms["Yield"] < df_farms["Yield"].mean()).mean()
-
-        if low_yield_ratio > 0.5:
-            insights_list.append(
-                "More than half of farms are below average yield. Improve soil management and fertilizer practices."
-            )
-
-    # =========================
-    # FINAL OUTPUT (HTML FORMAT FOR STREAMLIT)
-    # =========================
-    insights = "<br/>".join([f"• {i}" for i in insights_list])
-
-    elements.append(Paragraph(insights, styles["BodyText"]))
-    elements.append(Spacer(1, 20))
-
-    # =========================
-    # FOOTER
-    # =========================
-    elements.append(
-        Paragraph(
-            "Generated by Abaca Farming Management System © 2026",
-            styles["Italic"]
-        )
-    )
-
-    # =========================
-    # BUILD PDF
-    # =========================
-    doc.build(elements)
-
-    buffer.seek(0)
-    return buffer
-
-
-def generate_excel():
-
-    output = BytesIO()
-    wb = Workbook()
-
-    # =========================
-    # SHARED KPI VALUES (same as PDF)
-    # =========================
-    avg_yield = filtered_farms["Yield"].mean() if not filtered_farms.empty else 0
-    most_common_pest = (
-        filtered_pests["Pest Type"].mode()[0]
-        if not filtered_pests.empty else "N/A"
-    )
-
-    # =========================
-    # SUMMARY SHEET (MATCH PDF)
-    # =========================
-    ws = wb.active
-    ws.title = "Executive Summary"
-
-    ws.append(["Metric", "Value"])
-    ws.append(["Total Farmers", len(filtered_farmers)])
-    ws.append(["Total Farms", len(filtered_farms)])
-    ws.append(["Average Yield", round(avg_yield, 2)])
-    ws.append(["Most Common Pest", most_common_pest])
-
-    # =========================
-    # FARMERS (MATCH PDF TABLE)
-    # =========================
-    ws2 = wb.create_sheet("Farmer Demographics")
-    ws2.append(filtered_farmers.columns.tolist())
-
-    for row in filtered_farmers.values.tolist():
-        ws2.append(row)
-
-    # =========================
-    # FARMS (MATCH PDF ANALYSIS)
-    # =========================
-    ws3 = wb.create_sheet("Farm Data")
-    ws3.append(filtered_farms.columns.tolist())
-
-    for row in filtered_farms.values.tolist():
-        ws3.append(row)
-
-    # =========================
-    # PESTS (MATCH PDF INSIGHTS)
-    # =========================
-    ws4 = wb.create_sheet("Pest Data")
-    ws4.append(filtered_pests.columns.tolist())
-
-    for row in filtered_pests.values.tolist():
-        ws4.append(row)
-
-    # =========================
-    # CULTIVATION (OPTIONAL BUT MATCHES SYSTEM)
-    # =========================
-    ws5 = wb.create_sheet("Cultivation")
-    ws5.append(filtered_cultivation.columns.tolist())
-
-    for row in filtered_cultivation.values.tolist():
-        ws5.append(row)
-
-    wb.save(output)
-    output.seek(0)
-    return output
 
 # =========================
-# DOWNLOAD BUTTONS
+# ANALYTICS ENGINE
 # =========================
+
+corr = None
+
+if len(filtered_farms) >= 3:
+
+    corr = filtered_farms["Farm Area"].corr(
+        filtered_farms["Yield"]
+    )
+
+    if pd.isna(corr):
+        corr = None
+
+# Generate AI Analysis
+ai_result = generate_analysis_engine(
+    filtered_farmers,
+    filtered_farms,
+    filtered_pests,
+    corr
+)
+
+# =========================
+# AI GENERATED ANALYSIS
+# =========================
+
 st.markdown("---")
+
+st.markdown("## AI Interpretation")
+
+for item in ai_result["interpretation"]:
+
+    st.info(item)
+
+st.markdown("## AI Insights")
+
+
+for item in ai_result["insights"]:
+
+    st.success(item)
+
+st.markdown("## AI Recommendations")
+
+for item in ai_result["recommendations"]:
+
+    st.warning(item)
+
+# =========================
+# DOWNLOAD REPORTS
+# =========================
 
 d1, d2 = st.columns(2)
 
 with d1:
+
+    pdf_file = generate_pdf_report(
+        ai_result,
+        filtered_farmers,
+        filtered_farms,
+        filtered_pests
+    )
+
     st.download_button(
-        "Download PDF",
-        data=generate_pdf(corr, filtered_farms, filtered_pests, filtered_farmers),
-        file_name="abaca_report.pdf",
+        label="📄 Download PDF Report",
+        data=pdf_file,
+        file_name="abaca_analytics_report.pdf",
         mime="application/pdf"
     )
 
 with d2:
+
+    excel_file = generate_excel_report(
+        ai_result,
+        filtered_farmers,
+        filtered_farms,
+        filtered_pests
+    )
+
     st.download_button(
-        "Download Excel",
-        data=generate_excel(),
-        file_name="abaca_report.xlsx",
+        label="📊 Download Excel Report",
+        data=excel_file,
+        file_name="abaca_analytics_report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )

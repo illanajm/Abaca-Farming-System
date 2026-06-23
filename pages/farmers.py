@@ -3,6 +3,11 @@ from sqlalchemy import or_, func, cast, String
 from database import session, Farmer
 from datetime import date, datetime
 import pandas as pd
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
+from auth import has_permission
 
 # =========================
 # PAGE CONFIG
@@ -11,6 +16,11 @@ st.set_page_config(
     page_title="Farmers",
     layout="wide"
 )
+
+hide_streamlit_ui()
+render_sidebar() # Render custom sidebar with navigation links
+apply_global_css() # Apply global CSS for consistent styling
+render_header() # Render consistent header across pages
 
 # =========================
 # AUTH CHECK
@@ -33,83 +43,11 @@ st.markdown("""
     font-family: 'Segoe UI', sans-serif;
 }
 
-/* =========================
-   SIDEBAR
-   ========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
-    width: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* Sidebar buttons */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-/* =========================
-   LOGO AREA
-   ========================= */
-.logo-container {
-    text-align: center;
-    padding-top: 10px;
-    padding-bottom: 20px;
-}
-
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-    top: -100px;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
-
-.stButton > button {
-    background-color: transparent !important;
-    color: #006622 !important;
-    border: 1px solid #006622 !important;
-    border-radius: 8px !important;
-    height: 32px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
-}
-
-/* HOVER */
-.stButton > button:hover {
-    background-color: #006622 !important;
-    color: white !important;
-}
-
 /* PAGE TITLE */
 .page-title {
     font-size: 37px;
     font-weight: 800;
     color: #006622;
-    text-align: center;
 }
 
 .page-subtitle {
@@ -214,58 +152,6 @@ div[data-testid="stFileUploader"] button:hover::after {
 }
 </style>
 """, unsafe_allow_html=True)
-
-with st.sidebar:
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
-
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
-
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    st.page_link(
-        "pages/dashboard.py",
-        label="🏠 Dashboard"
-    )
-
-    st.page_link(
-        "pages/farmers.py",
-        label="👨‍🌾 Farmers"
-    )
-
-    st.page_link(
-        "pages/farms.py",
-        label="🌱 Farms"
-    )
-
-    st.page_link(
-        "pages/cultivation.py",
-        label="🌾 Cultivation"
-    )
-
-    st.page_link(
-        "pages/pest_management.py",
-        label="🐛 Pest Management"
-    )
-
-    st.page_link(
-        "pages/soil_management.py",
-        label="🧪 Soil Management"
-    )
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
-
-    st.markdown("---")
 
 # =========================
 # CALCULATE AGE FUNCTION
@@ -587,19 +473,6 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
-
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(f"User: {st.session_state.get('user', 'Farmer')}")
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
-
 # =========================
 # TABLE HEADER ACTIONS
 # =========================
@@ -685,6 +558,18 @@ with upload_col:
             st.error(f"Missing columns: {missing}")
             st.stop()
 
+        
+        existing_farmers = session.query(Farmer).all()
+
+        farmers_map = {
+            (
+                f.firstname.strip().lower(),
+                f.middlename.strip().lower(),
+                f.lastname.strip().lower()
+            ): f
+            for f in existing_farmers
+        }
+
 
         if st.button("Import Farmers"):
 
@@ -695,6 +580,16 @@ with upload_col:
             for i, row in df.iterrows():
 
                 try:
+                    firstname = str(row["firstname"]).strip()
+                    middlename = str(row["middlename"]).strip()
+                    lastname = str(row["lastname"]).strip()
+
+                    key = (
+                        firstname.lower(),
+                        middlename.lower(),
+                        lastname.lower()
+                    )
+
                     birthdate = pd.to_datetime(row["birthdate"], errors="coerce")
 
                     if pd.isna(birthdate):
@@ -704,32 +599,61 @@ with upload_col:
                     birthdate = birthdate.date()
                     age = calculate_age(birthdate)
 
-                    # SAFE CONVERSIONS
                     def safe_int(val):
                         try:
                             return int(val)
                         except:
                             return 0
 
-                    farmer = Farmer(
-                        firstname=str(row["firstname"]).strip(),
-                        middlename=str(row["middlename"]).strip(),
-                        lastname=str(row["lastname"]).strip(),
-                        sex=str(row["sex"]).strip(),
-                        birthdate=str(birthdate),
-                        age=age,
-                        civil_status=str(row["civil_status"]).strip(),
-                        city_municipality=str(row["city_municipality"]).strip(),
-                        barangay=str(row["barangay"]).strip(),
-                        years_in_farming=safe_int(row["years_in_farming"]),
-                        farming_break=safe_int(row["farming_break"]),
-                        break_year_start=safe_int(row["break_year_start"]),
-                        break_year_end=safe_int(row["break_year_end"]),
-                        reason_for_break=str(row["reason_for_break"] or "")
-                    )
+                    # =========================
+                    # IF EXISTS → UPDATE
+                    # =========================
+                    if key in farmers_map:
 
-                    session.add(farmer)
-                    inserted += 1
+                        farmer = farmers_map[key]
+
+                        farmer.sex = str(row["sex"]).strip()
+                        farmer.birthdate = str(birthdate)
+                        farmer.age = age
+                        farmer.civil_status = str(row["civil_status"]).strip()
+                        farmer.city_municipality = str(row["city_municipality"]).strip()
+                        farmer.barangay = str(row["barangay"]).strip()
+                        farmer.years_in_farming = safe_int(row["years_in_farming"])
+                        farmer.farming_break = safe_int(row["farming_break"])
+                        farmer.break_year_start = safe_int(row["break_year_start"])
+                        farmer.break_year_end = safe_int(row["break_year_end"])
+                        farmer.reason_for_break = str(row["reason_for_break"] or "")
+
+                        updated += 1
+
+                    # =========================
+                    # ELSE → INSERT NEW
+                    # =========================
+                    else:
+
+                        farmer = Farmer(
+                            firstname=firstname,
+                            middlename=middlename,
+                            lastname=lastname,
+                            sex=str(row["sex"]).strip(),
+                            birthdate=str(birthdate),
+                            age=age,
+                            civil_status=str(row["civil_status"]).strip(),
+                            city_municipality=str(row["city_municipality"]).strip(),
+                            barangay=str(row["barangay"]).strip(),
+                            years_in_farming=safe_int(row["years_in_farming"]),
+                            farming_break=safe_int(row["farming_break"]),
+                            break_year_start=safe_int(row["break_year_start"]),
+                            break_year_end=safe_int(row["break_year_end"]),
+                            reason_for_break=str(row["reason_for_break"] or "")
+                        )
+
+                        session.add(farmer)
+
+                        # also add to map so duplicates inside Excel update properly
+                        farmers_map[key] = farmer
+
+                        inserted += 1
 
                 except Exception as e:
                     skipped += 1
@@ -818,6 +742,29 @@ if search:
 farmers = query.all()
 
 # =========================
+# PAGINATION
+# =========================
+ROWS_PER_PAGE = 10
+
+total_rows = len(farmers)
+total_pages = max((total_rows - 1) // ROWS_PER_PAGE + 1, 1)
+
+if "farmer_page" not in st.session_state:
+    st.session_state.farmer_page = 1
+
+# Keep current page valid
+if st.session_state.farmer_page > total_pages:
+    st.session_state.farmer_page = total_pages
+
+if st.session_state.farmer_page < 1:
+    st.session_state.farmer_page = 1
+
+start_idx = (st.session_state.farmer_page - 1) * ROWS_PER_PAGE
+end_idx = start_idx + ROWS_PER_PAGE
+
+paginated_farmers = farmers[start_idx:end_idx]
+
+# =========================
 # TABLE
 # =========================
 with st.container(border=True):
@@ -841,8 +788,8 @@ with st.container(border=True):
         st.info("No farmers found.")
 
     for index, farmer in enumerate(
-        farmers,
-        start=1
+        paginated_farmers,
+        start=start_idx + 1
     ):
 
         c0, c1, c2, c3, c4, c5, c6, c7 = st.columns(
@@ -895,9 +842,53 @@ with st.container(border=True):
                     )
 
             with b3:
+                if has_permission("delete"):
+                    if st.button("🗑", key=f"del_{farmer.id}"):
+                        delete_farmer_dialog(farmer.id)
 
-                if st.button("🗑", key=f"del_{farmer.id}"):
-                    delete_farmer_dialog(farmer.id)
+# =========================
+# PAGINATION CONTROLS
+# =========================
+if total_rows > 0:
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    p1, p2, p3 = st.columns([.04, .08, .9])
+
+    with p1:
+        if st.button(
+            "⬅",
+            disabled=st.session_state.farmer_page == 1,
+            use_container_width=False
+        ):
+            st.session_state.farmer_page -= 1
+            st.rerun()
+
+    with p2:
+        st.markdown(
+            f"""
+            <div style="
+                font-size:12px;
+                color:gray;
+                text-align:left;
+                padding-top:6px;
+            ">
+                Page <b>{st.session_state.farmer_page}</b> / {total_pages}
+                &nbsp;|&nbsp;
+                {start_idx + 1}-{min(end_idx, total_rows)} of {total_rows}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with p3:
+        if st.button(
+            "➡",
+            disabled=st.session_state.farmer_page == total_pages,
+            use_container_width=False
+        ):
+            st.session_state.farmer_page += 1
+            st.rerun()
 
 
 # =========================

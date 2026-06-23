@@ -3,20 +3,37 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from sqlalchemy import func
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
+
 from database import (
     session,
     Farmer,
     Farm,
     AbacaCultivation,
     PestManagement,
-    SoilManagement
-)
-from analytics_engine import (
-    descriptive_stats,
-    frequency_table,
-    correlation_analysis,
-    detect_outliers,
-    generate_insights
+    SoilManagement,
+    SoilQuality,
+    SoilType,
+    IrrigationSource,
+    EnvironmentalFactor,
+    AccessToInputs,
+    InputSource,
+    Variety,
+    PlantingMethod,
+    PlantingDistance,
+    IntercropCrops,
+    PestType,
+    PestImpact,
+    ControlMethod,
+    ControlFrequency,
+    SoilTesting,
+    TestingFrequency,
+    SoilConservation,
+    ConservationTechniques,
+    SeasonalEffects
 )
 
 # ---------------- PAGE CONFIG ----------------
@@ -24,6 +41,11 @@ st.set_page_config(
     page_title="Abaca Farming System",
     layout="wide"
 )
+
+hide_streamlit_ui() # Hide default Streamlit UI elements
+render_sidebar() # Render custom sidebar with navigation links
+apply_global_css() # Apply global CSS for consistent styling
+render_header() # Render consistent header across pages
 
 # ---------------- CUSTOM CSS ----------------
 st.markdown("""
@@ -33,77 +55,6 @@ st.markdown("""
 }
 .stApp {
     background-color: #f0f7f2;  /* clean dashboard gray */
-}
-/* =========================
-   SIDEBAR
-   ========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
-
-    width: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* Sidebar buttons */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-/* =========================
-   LOGO AREA
-   ========================= */
-.logo-container {
-    text-align: center;
-    padding-top: 10px;
-    padding-bottom: 20px;
-}
-
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-    top: -100px;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
-
-.stButton > button {
-    background-color: transparent !important;
-    color: #006622 !important;
-    border: 1px solid #006622 !important;
-    border-radius: 8px !important;
-    height: 32px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
-}
-
-/* HOVER */
-.stButton > button:hover {
-    background-color: #006622 !important;
-    color: white !important;
 }
 
 .metric-card {
@@ -153,58 +104,6 @@ section[data-testid="stSidebar"] * {
 </style>
 """, unsafe_allow_html=True)
 
-with st.sidebar:
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
-
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
-
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    st.page_link(
-        "pages/dashboard.py",
-        label="🏠 Dashboard"
-    )
-
-    st.page_link(
-        "pages/farmers.py",
-        label="👨‍🌾 Farmers"
-    )
-
-    st.page_link(
-        "pages/farms.py",
-        label="🌱 Farms"
-    )
-
-    st.page_link(
-        "pages/cultivation.py",
-        label="🌾 Cultivation"
-    )
-
-    st.page_link(
-        "pages/pest_management.py",
-        label="🐛 Pest Management"
-    )
-
-    st.page_link(
-        "pages/soil_management.py",
-        label="🧪 Soil Management"
-    )
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
-
-    st.markdown("---")
-
 
 # =========================
 # DATABASE COUNTS (REAL DATA)
@@ -213,15 +112,25 @@ total_farmers = session.query(Farmer).count()
 
 total_farms = session.query(Farm).count()
 
-soil_quality_data = session.query(
-    Farm.soil_quality,
-    func.count(Farm.id).label("total")
-).group_by(Farm.soil_quality).all()
+soil_quality_data = (
+    session.query(
+        SoilQuality.code,
+        func.count(Farm.id).label("total")
+    )
+    .join(SoilQuality, SoilQuality.id == Farm.soil_quality_id)
+    .group_by(SoilQuality.code)
+    .all()
+)
 
-soil_type_data = session.query(
-    Farm.soil_type,
-    func.count(Farm.id).label("total")
-).group_by(Farm.soil_type).all()
+soil_type_data = (
+    session.query(
+        SoilType.code,
+        func.count(Farm.id).label("total")
+    )
+    .join(SoilType, SoilType.id == Farm.soil_type_id)
+    .group_by(SoilType.code)
+    .all()
+)
 
 overall_total_production = session.query(func.sum(Farm.average_yield)).scalar() or 0
 
@@ -251,10 +160,15 @@ total_soil = session.query(SoilManagement).count()
 
 farmers = session.query(Farmer.age).all()
 
-irrigation_data = session.query(
-    Farm.irrigation_source,
-    func.count(Farm.farmer_id).label("total_farmers")
-).group_by(Farm.irrigation_source).all()
+irrigation_data = (
+    session.query(
+        IrrigationSource.code,
+        func.count(Farm.id).label("total_farmers")
+    )
+    .join(IrrigationSource, IrrigationSource.id == Farm.irrigation_source_id)
+    .group_by(IrrigationSource.code)
+    .all()
+)
 
 production_by_year = session.query(
     AbacaCultivation.year_first_planted,
@@ -263,30 +177,6 @@ production_by_year = session.query(
  .group_by(AbacaCultivation.year_first_planted)\
  .order_by(AbacaCultivation.year_first_planted)\
  .all()
-
-# ---------------- HEADER ----------------
-col1, col2 = st.columns([9, 1])
-
-with col1:
-    st.markdown(
-        "<h4 style='margin-bottom:0px;'>Dashboard</h4>",
-        unsafe_allow_html=True
-    )
-
-with col2:
-
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(f"User: {st.session_state.get('user', 'Farmer')}")
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
-
-st.write("")
 
 # ---------------- TOP METRICS ----------------
 m1, m2, m3, m4 = st.columns(4)

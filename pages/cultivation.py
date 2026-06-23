@@ -1,7 +1,12 @@
 import streamlit as st
-from database import session, Farm, AbacaCultivation, Farmer
+from database import session, Farm, AbacaCultivation, Farmer, Variety, PlantingDistance, PlantingMethod, IntercropCrops
 from sqlalchemy import or_, func
 import pandas as pd
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
+from auth import has_permission
 
 # =========================
 # PAGE CONFIG
@@ -10,6 +15,11 @@ st.set_page_config(
     page_title="Cultivation",
     layout="wide"
 )
+
+hide_streamlit_ui()
+render_sidebar()
+apply_global_css()
+render_header()
 
 # =========================
 # CUSTOM CSS
@@ -23,60 +33,12 @@ st.markdown("""
 }
 
 /* =========================
-   SIDEBAR
-========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
-    width: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* SIDEBAR BUTTONS */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-/* =========================
-   LOGO AREA
-========================= */
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
-
-/* =========================
    PAGE TITLE
 ========================= */
 .page-title {
     font-size: 37px;
     font-weight: 800;
     color: #006622;
-    text-align: center;
 }
 
 .page-subtitle {
@@ -203,35 +165,28 @@ if not st.session_state.get("logged_in"):
     st.warning("Login first")
     st.switch_page("app.py")
 
-# =========================
-# SIDEBAR
-# =========================
-with st.sidebar:
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+def rf_select(label, model):
+    options = session.query(model).all()
 
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
+    mapping = {
+        f"{o.code} - {o.description}": o.id
+        for o in options
+    }
 
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
+    selected = st.selectbox(label, list(mapping.keys()))
+    return mapping[selected]
 
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown("---")
+def get_rf_id(model, value):
+    if not value:
+        return None
 
-    st.page_link("pages/dashboard.py", label="🏠 Dashboard")
-    st.page_link("pages/farmers.py", label="👨‍🌾 Farmers")
-    st.page_link("pages/farms.py", label="🌱 Farms")
-    st.page_link("pages/cultivation.py", label="🌾 Cultivation")
-    st.page_link("pages/pest_management.py", label="🐛 Pest Management")
-    st.page_link("pages/soil_management.py", label="🧪 Soil Management")
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
+    obj = session.query(model).filter(
+        model.description.ilike(str(value).strip())
+    ).first()
+
+    return obj.id if obj else None
 
 # =========================
 # ADD CULTIVATION DIALOG
@@ -240,6 +195,10 @@ with st.sidebar:
 def add_cultivation_dialog():
 
     farmers = session.query(Farmer).all()
+    varieties = session.query(Variety).all()
+    planting_distances = session.query(PlantingDistance).all()
+    planting_methods = session.query(PlantingMethod).all()
+    intercrops_crops = session.query(IntercropCrops).all()
 
     farmer_map = {
         f.id: f"{f.firstname} {f.middlename[0] + '.' if f.middlename else ''} {f.lastname}"
@@ -267,19 +226,34 @@ def add_cultivation_dialog():
             format="%.2f"
         )
 
-        variety = st.text_input (
-            "Variety"
+        variety = st.selectbox(
+            "Variety",
+            varieties,
+            format_func=lambda x: f"{x.code} - {x.description}"
         )
 
-        planting_distance = st.text_input("Planting Distance (meters)")
-        planting_method = st.text_input("Planting Method")
+        planting_distance = st.selectbox(
+            "Planting Distance (meters)",
+            planting_distances,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
+        planting_method = st.selectbox(
+            "Planting Method",
+            planting_methods,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
 
         intercropping = st.selectbox(
             "Intercropping",
             ["Yes", "No"]
         )
 
-        intercrop_crops = st.text_input("Intercrop Crops")
+        intercrop_crops = st.selectbox(
+            "Intercrop Crops",
+            intercrops_crops,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
 
         submitted = st.form_submit_button("Save")
 
@@ -289,11 +263,11 @@ def add_cultivation_dialog():
                 farm_id=farm.id,
                 year_first_planted=year_first,
                 abaca_area=abaca_area,
-                variety=variety,
-                planting_distance=planting_distance,
-                planting_method=planting_method,
+                variety_id=variety.id,
+                planting_distance_id=planting_distance.id,
+                planting_method_id=planting_method.id,
                 intercropping=intercropping,
-                intercrop_crops=intercrop_crops
+                intercrop_crops_id=intercrop_crops.id
             )
 
             session.add(record)
@@ -312,14 +286,19 @@ def view_cultivation_dialog(record_id):
         AbacaCultivation
     ).filter_by(id=record_id).first()
 
+    variety = session.query(Variety).filter_by(id=record.variety_id).first()
+    planting_method = session.query(PlantingMethod).filter_by(id=record.planting_method_id).first()
+    planting_distance = session.query(PlantingDistance).filter_by(id=record.planting_distance_id).first()
+    intercrop_crops = session.query(IntercropCrops).filter_by(id=record.intercrop_crops_id).first()
+
     st.markdown("### Cultivation Information")
 
-    st.write(f"**Variety:** {record.variety}")
+    st.write(f"**Variety:** {variety.description if variety else 'N/A'}")
     st.write(f"**Abaca Area:** {record.abaca_area}")
-    st.write(f"**Planting Method:** {record.planting_method}")
-    st.write(f"**Planting Distance (Meters):** {record.planting_distance}")
+    st.write(f"**Planting Method:** {planting_method.description if planting_method else 'N/A'}")
+    st.write(f"**Planting Distance (Meters):** {planting_distance.description if planting_distance else 'N/A'}")
     st.write(f"**Intercropping:** {record.intercropping}")
-    st.write(f"**Intercrop Crops:** {record.intercrop_crops}")
+    st.write(f"**Intercrop Crops:** {intercrop_crops.description if intercrop_crops else 'N/A'}")
     st.write(f"**Year First Planted:** {record.year_first_planted}")
 
     st.markdown("---")
@@ -337,47 +316,112 @@ def edit_cultivation_dialog(record_id):
         AbacaCultivation
     ).filter_by(id=record_id).first()
 
+    record = session.get(AbacaCultivation, record_id)
+
+    farmers = session.query(Farmer).all()
+    farms = session.query(Farm).all()
+    varieties = session.query(Variety).all()
+    planting_distances = session.query(PlantingDistance).all()
+    planting_methods = session.query(PlantingMethod).all()
+    intercrops_crops = session.query(IntercropCrops).all()
+
+
+    selected_farm = session.get(
+        Farm, record.farm_id
+    )
+
+    selected_variety = session.get(
+        Variety, record.variety_id
+    )
+
+    selected_planting_distance = session.get(
+        PlantingDistance, record.planting_distance_id
+    )
+
+    selected_planting_method = session.get(
+        PlantingMethod, record.planting_method_id
+    )
+
+    selected_intercrop_crops = session.get(
+        IntercropCrops, record.intercrop_crops_id
+    )
+
     with st.form("edit_form"):
 
-        variety = st.text_input (
-            "Variety",
-            value=record.variety or ""
+        farm = st.selectbox(
+            "Farm",
+            farms,
+            format_func=lambda x: (
+                f"{session.get(Farmer, x.farmer_id).firstname} "
+                f"{session.get(Farmer, x.farmer_id).middlename} "
+                f"{session.get(Farmer, x.farmer_id).lastname} "
+                f"(Farm #{x.id})"
+            ),
+            index=farms.index(selected_farm)
+            if selected_farm in farms else 0
         )
+
+        variety = st.selectbox(
+            "Variety",
+            varieties,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=varieties.index(selected_variety)
+            if selected_variety in varieties else 0
+        )
+
+        year_first = st.number_input(
+            "Year First Planted",
+            1900,
+            2100,
+            value=record.year_first_planted
+        )
+
         abaca_area = st.number_input(
             "Abaca Area",
             value=float(record.abaca_area)
         )
 
-        planting_distance = st.text_input(
+        planting_distance = st.selectbox(
             "Planting Distance (meters)",
-            value=record.planting_distance or ""
+            planting_distances,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=planting_distances.index(selected_planting_distance)
+            if selected_planting_distance in planting_distances else 0
         )
 
-        planting_method = st.text_input(
+        planting_method = st.selectbox(
             "Planting Method",
-            value=record.planting_method or ""
+            planting_methods,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=planting_methods.index(selected_planting_method)
+            if selected_planting_method in planting_methods else 0
         )
 
-        intercropping = st.text_input(
+        intercropping = st.selectbox(
             "Intercropping",
-            value=record.intercropping or ""
+            ["Yes", "No"],
+            index=["Yes", "No"].index(record.intercropping or "No")
         )
 
-        intercrop_crops = st.text_input(
+        intercrop_crops = st.selectbox(
             "Intercrop Crops",
-            value=record.intercrop_crops or ""
+            intercrops_crops,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=intercrops_crops.index(selected_intercrop_crops)
+            if selected_intercrop_crops in intercrops_crops else 0
         )
 
         update = st.form_submit_button("Update")
 
         if update:
-
-            record.variety = variety
+            record.farm_id = farm.id
+            record.variety_id = variety.id
             record.abaca_area = abaca_area
-            record.planting_distance = planting_distance
-            record.planting_method = planting_method
+            record.year_first_planted = year_first
+            record.planting_distance_id = planting_distance.id
+            record.planting_method_id = planting_method.id
             record.intercropping = intercropping
-            record.intercrop_crops = intercrop_crops
+            record.intercrop_crops_id = intercrop_crops.id
 
             session.commit()
 
@@ -430,20 +474,6 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
-
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(
-            f"User: {st.session_state.get('user', 'Farmer')}"
-        )
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
 
 # =========================
 # SEARCH + ADD
@@ -580,6 +610,27 @@ with upload_col:
                         skipped += 1
                         continue
 
+
+                    # =========================
+                    # LOOKUPS
+                    # =========================
+                    variety_id = get_rf_id(Variety, row["variety"])
+                    planting_distance_id = get_rf_id(PlantingDistance, row["planting_distance"])
+                    planting_method_id = get_rf_id(PlantingMethod, row["planting_method"])
+                    intercrop_crops_id = get_rf_id(IntercropCrops, row["intercrop_crops"])
+                    
+                    # =========================
+                    # SKIP IF REQUIRED LOOKUPS FAIL
+                    # =========================
+                    if (
+                        variety_id is None
+                        or planting_distance_id is None
+                        or planting_method_id is None
+                        or intercrop_crops_id is None
+                    ):
+                        skipped += 1
+                        continue
+
                     # =========================
                     # CREATE CULTIVATION RECORD
                     # =========================
@@ -587,11 +638,11 @@ with upload_col:
                         farm_id=farm.id,
                         year_first_planted=int(row["year_first_planted"] or 0),
                         abaca_area=float(row["abaca_area"] or 0),
-                        variety=str(row["variety"] or ""),
-                        planting_distance=str(row["planting_distance"] or ""),
-                        planting_method=str(row["planting_method"] or ""),
+                        variety_id=variety_id,
+                        planting_distance_id=planting_distance_id,
+                        planting_method_id=planting_method_id,
                         intercropping=str(row["intercropping"] or ""),
-                        intercrop_crops=str(row["intercrop_crops"] or "")
+                        intercrop_crops_id=intercrop_crops_id
                     )
 
                     session.add(record)
@@ -633,37 +684,75 @@ if search:
 records = query.all()
 
 # =========================
+# PAGINATION
+# =========================
+ROWS_PER_PAGE = 10
+
+total_rows = len(records)
+total_pages = max((total_rows - 1) // ROWS_PER_PAGE + 1, 1)
+
+if "cultivation_page" not in st.session_state:
+    st.session_state.cultivation_page = 1
+
+# Keep current page valid
+if st.session_state.cultivation_page > total_pages:
+    st.session_state.cultivation_page = total_pages
+
+if st.session_state.cultivation_page < 1:
+    st.session_state.cultivation_page = 1
+
+start_idx = (st.session_state.cultivation_page - 1) * ROWS_PER_PAGE
+end_idx = start_idx + ROWS_PER_PAGE
+
+paginated_records = records[start_idx:end_idx]
+
+# =========================
 # TABLE
 # =========================
 with st.container(border=True):
 
-    h0, h1, h2, h3, h4 = st.columns(
-        [3, 2, 2, 2, 2]
+    h0, h1, h2, h3, h4, h5, h6 = st.columns(
+        [1, 3, 3, 2, 2, 2, 2]
     )
 
-    h0.markdown("<div class='table-header'>Variety</div>", unsafe_allow_html=True)
-    h1.markdown("<div class='table-header'>Abaca Area</div>", unsafe_allow_html=True)
-    h2.markdown("<div class='table-header'>Planting Method</div>", unsafe_allow_html=True)
-    h3.markdown("<div class='table-header'>Year Planted</div>", unsafe_allow_html=True)
-    h4.markdown("<div class='table-header'>Actions</div>", unsafe_allow_html=True)
+    h0.markdown("<div class='table-header'>#</div>", unsafe_allow_html=True)
+    h1.markdown("<div class='table-header'>Farmer</div>", unsafe_allow_html=True)
+    h2.markdown("<div class='table-header'>Variety</div>", unsafe_allow_html=True)
+    h3.markdown("<div class='table-header'>Abaca Area</div>", unsafe_allow_html=True)
+    h4.markdown("<div class='table-header'>Planting Method</div>", unsafe_allow_html=True)
+    h5.markdown("<div class='table-header'>Year Planted</div>", unsafe_allow_html=True)
+    h6.markdown("<div class='table-header'>Actions</div>", unsafe_allow_html=True)
 
     st.divider()
 
     if not records:
         st.info("No cultivation records found.")
 
-    for r in records:
+    for i, r in enumerate(
+        paginated_records,
+        start=1
+    ):
+        farm = session.query(Farm).filter_by(id=r.farm_id).first()
+        farmer = session.query(Farmer).filter_by(id=farm.farmer_id).first()
+        variety = session.query(Variety).filter_by(id=r.variety_id).first()
+        planting_method = session.query(PlantingMethod).filter_by(id=r.planting_method_id).first()
 
-        c0, c1, c2, c3, c4 = st.columns(
-            [3, 2, 2, 2, 2]
+        c0, c1, c2, c3, c4, c5, c6 = st.columns(
+            [1, 3, 3, 2, 2, 2, 2]
         )
 
-        c0.write(f"{r.variety}")
-        c1.write(f"{r.abaca_area}")
-        c2.write(f"{r.planting_method}")
-        c3.write(f"{r.year_first_planted}")
+        c0.write(i)
+        c1.write(
+            f"{farmer.firstname} "
+            f"{farmer.middlename[0] + '.' if farmer.middlename else ''} "
+            f"{farmer.lastname}"
+        )
+        c2.write(f"{variety.description if variety else 'N/A'}")
+        c3.write(f"{r.abaca_area}")
+        c4.write(f"{planting_method.description if planting_method else 'N/A'}")
+        c5.write(f"{r.year_first_planted}")
 
-        with c4:
+        with c6:
 
             b1, b2, b3 = st.columns(3)
 
@@ -686,10 +775,54 @@ with st.container(border=True):
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with b3:
+                if has_permission("delete"):
+                    st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
 
-                st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
+                    if st.button("🗑", key=f"delete_{r.id}"):
+                        delete_cultivation_dialog(r.id)
 
-                if st.button("🗑", key=f"delete_{r.id}"):
-                    delete_cultivation_dialog(r.id)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-                st.markdown('</div>', unsafe_allow_html=True)
+# =========================
+# PAGINATION CONTROLS
+# =========================
+if total_rows > 0:
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    p1, p2, p3 = st.columns([.04, .08, .9])
+
+    with p1:
+        if st.button(
+            "⬅",
+            disabled=st.session_state.cultivation_page == 1,
+            use_container_width=False
+        ):
+            st.session_state.cultivation_page -= 1
+            st.rerun()
+
+    with p2:
+        st.markdown(
+            f"""
+            <div style="
+                font-size:12px;
+                color:gray;
+                text-align:left;
+                padding-top:6px;
+            ">
+                Page <b>{st.session_state.cultivation_page}</b> / {total_pages}
+                &nbsp;|&nbsp;
+                {start_idx + 1}-{min(end_idx, total_rows)} of {total_rows}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with p3:
+        if st.button(
+            "➡",
+            disabled=st.session_state.cultivation_page == total_pages,
+            use_container_width=False
+        ):
+            st.session_state.cultivation_page += 1
+            st.rerun()

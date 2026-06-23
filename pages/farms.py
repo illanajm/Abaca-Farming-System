@@ -2,7 +2,12 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import or_, func, cast, String
 from datetime import datetime
-from database import session, Farmer, Farm
+from database import session, Farmer, Farm, SoilQuality, SoilType, IrrigationSource, EnvironmentalFactor, AccessToInputs, InputSource
+from auth import is_admin, has_permission
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
 
 # =========================
 # PAGE CONFIG
@@ -11,6 +16,11 @@ st.set_page_config(
     page_title="Farms",
     layout="wide"
 )
+
+hide_streamlit_ui()
+render_sidebar() # Render custom sidebar with navigation links
+apply_global_css() # Apply global CSS for consistent styling
+render_header() # Render consistent header across pages
 
 # =========================
 # CUSTOM CSS
@@ -23,52 +33,6 @@ st.markdown("""
     font-family: 'Segoe UI', sans-serif;
 }
 
-/* =========================
-   SIDEBAR
-========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
-    width: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* SIDEBAR BUTTONS */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-/* =========================
-   LOGO AREA
-========================= */
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
 
 /* =========================
    PAGE TITLE
@@ -77,7 +41,6 @@ section[data-testid="stSidebar"] * {
     font-size: 37px;
     font-weight: 800;
     color: #006622;
-    text-align: center;
 }
 
 .page-subtitle {
@@ -207,35 +170,29 @@ if not st.session_state.logged_in:
     st.warning("Please login first.")
     st.switch_page("app.py")
 
-# =========================
-# SIDEBAR
-# =========================
-with st.sidebar:
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+def rf_select(label, model):
+    options = session.query(model).all()
 
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
+    mapping = {
+        f"{o.code} - {o.description}": o.id
+        for o in options
+    }
 
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
+    selected = st.selectbox(label, list(mapping.keys()))
+    return mapping[selected]
 
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown("---")
+def get_rf_id(model, value):
+    if not value:
+        return None
 
-    st.page_link("pages/dashboard.py", label="🏠 Dashboard")
-    st.page_link("pages/farmers.py", label="👨‍🌾 Farmers")
-    st.page_link("pages/farms.py", label="🌱 Farms")
-    st.page_link("pages/cultivation.py", label="🌾 Cultivation")
-    st.page_link("pages/pest_management.py", label="🐛 Pest Management")
-    st.page_link("pages/soil_management.py", label="🧪 Soil Management")
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
+    obj = session.query(model).filter(
+        model.description.ilike(str(value).strip())
+    ).first()
+
+    return obj.id if obj else None
+    
 
 # =========================
 # ADD FARM DIALOG
@@ -244,6 +201,12 @@ with st.sidebar:
 def add_farm_dialog():
 
     farmers = session.query(Farmer).all()
+    soil_qualities = session.query(SoilQuality).all()
+    soil_types = session.query(SoilType).all()
+    irrigation_sources = session.query(IrrigationSource).all()
+    environmental_factors = session.query(EnvironmentalFactor).all()
+    access_to_inputs = session.query(AccessToInputs).all()
+    input_sources = session.query(InputSource).all()
 
     with st.form("add_farm_form"):
 
@@ -258,28 +221,40 @@ def add_farm_dialog():
             min_value=0.0
         )
 
-        soil_quality = st.text_input (
-            "Soil Quality"
+        soil_quality = st.selectbox(
+            "Soil Quality",
+            soil_qualities,
+            format_func=lambda x: f"{x.code} - {x.description}"
         )
 
-        soil_type = st.text_input (
-            "Soil Type"
+        soil_type = st.selectbox(
+            "Soil Type",
+            soil_types,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
+        irrigation_source = st.selectbox(
+            "Irrigation Source",
+            irrigation_sources,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
+        environmental_factors = st.selectbox(
+            "Environment Factors",
+            environmental_factors,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
+        access_to_inputs = st.selectbox(
+            "Access to Inputs",
+            access_to_inputs,
+            format_func=lambda x: f"{x.code} - {x.description}"
         )
         
-        irrigation_source = st.text_input (
-            "Irrigation Source"
-        )
-
-        environmental_factors = st.text_input (
-            "Environment Factors"
-        )
-
-        access_to_inputs = st.text_input (
-            "Access to Inputs"
-        )
-        
-        input_source = st.text_input (
-            "Input Source"
+        input_source = st.selectbox(
+            "Input Source",
+            input_sources,
+            format_func=lambda x: f"{x.code} - {x.description}"
         )
 
         average_yield = st.number_input(
@@ -294,12 +269,12 @@ def add_farm_dialog():
             farm = Farm(
                 farmer_id=farmer.id,
                 farm_area=farm_area,
-                soil_quality=soil_quality,
-                soil_type=soil_type,
-                irrigation_source=irrigation_source,
-                environmental_factors=environmental_factors,
-                access_to_inputs=access_to_inputs,
-                input_source=input_source,
+                soil_quality_id=soil_quality.id,
+                soil_type_id=soil_type.id,
+                irrigation_source_id=irrigation_source.id,
+                environmental_factor_id=environmental_factors.id,
+                access_to_inputs_id=access_to_inputs.id,
+                input_source_id=input_source.id,
                 average_yield=average_yield
             )
 
@@ -315,43 +290,106 @@ def add_farm_dialog():
 @st.dialog("✏ Edit Farm")
 def edit_farm_dialog(farm_id):
 
-    farm = session.query(Farm).get(farm_id)
+    farm = session.get(Farm, farm_id)
+
+    # LOAD OPTIONS
+    farmers = session.query(Farmer).all()
+    soil_qualities = session.query(SoilQuality).all()
+    soil_types = session.query(SoilType).all()
+    irrigation_sources = session.query(IrrigationSource).all()
+    environmental_factors = session.query(EnvironmentalFactor).all()
+    access_to_inputs = session.query(AccessToInputs).all()
+    input_sources = session.query(InputSource).all()
+
+    selected_farmer = session.get(
+        Farmer, farm.farmer_id
+    )
+
+    selected_soil_quality = session.get(
+        SoilQuality, farm.soil_quality_id
+    )
+
+    selected_soil_type = session.get(
+        SoilType, farm.soil_type_id
+    )
+
+    selected_irrigation_source = session.get(
+        IrrigationSource, farm.irrigation_source_id
+    )
+
+    selected_environmental_factor = session.get(
+        EnvironmentalFactor, farm.environmental_factor_id
+    )
+
+    selected_access_to_inputs = session.get(
+        AccessToInputs, farm.access_to_inputs_id
+    )
+
+    selected_input_source = session.get(
+        InputSource, farm.input_source_id
+    )
 
     with st.form("edit_farm_form"):
+
+        farmer = st.selectbox(
+            "Farmer",
+            farmers,
+            format_func=lambda x: f"{x.firstname} {x.middlename} {x.lastname}",
+            index=farmers.index(selected_farmer)
+            if selected_farmer in farmers else 0
+        )
 
         farm_area = st.number_input(
             "Farm Area (ha)",
             value=float(farm.farm_area or 0)
         )
 
-        soil_quality = st.text_input (
+        soil_quality = st.selectbox(
             "Soil Quality",
-            value=farm.soil_quality or ""
+            soil_qualities,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=soil_qualities.index(selected_soil_quality)
+            if selected_soil_quality in soil_qualities else 0
         )
-        
-        soil_type = st.text_input(
+
+        soil_type = st.selectbox(
             "Soil Type",
-            value=farm.soil_type or ""
+            soil_types,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=soil_types.index(selected_soil_type)
+            if selected_soil_type in soil_types else 0
         )
 
-        irrigation_source = st.text_input (
+        irrigation_source = st.selectbox(
             "Irrigation Source",
-            value=farm.irrigation_source or ""
+            irrigation_sources,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=irrigation_sources.index(selected_irrigation_source)
+            if selected_irrigation_source in irrigation_sources else 0
         )
 
-        environmental_factors = st.text_input (
-            "Environment Factors",
-            value=farm.environmental_factors or ""
+        environmental_factor = st.selectbox(
+            "Environmental Factor",
+            environmental_factors,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=environmental_factors.index(selected_environmental_factor)
+            if selected_environmental_factor in environmental_factors else 0
         )
 
-        access_to_inputs = st.text_input (
+        access_to_input = st.selectbox(
             "Access to Inputs",
-            value=farm.access_to_inputs or ""
+            access_to_inputs,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=access_to_inputs.index(selected_access_to_inputs)
+            if selected_access_to_inputs in access_to_inputs else 0
         )
 
-        input_source = st.text_input (
+        input_source = st.selectbox(
             "Input Source",
-            value=farm.input_source or ""
+            input_sources,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=input_sources.index(selected_input_source)
+            if selected_input_source in input_sources else 0
         )
 
         average_yield = st.number_input(
@@ -362,18 +400,19 @@ def edit_farm_dialog(farm_id):
         update = st.form_submit_button("Update")
 
         if update:
-
+            farm.farmer_id = farmer.id
             farm.farm_area = farm_area
-            farm.soil_quality = soil_quality
-            farm.soil_type = soil_type
-            farm.irrigation_source = irrigation_source
-            farm.environmental_factors = environmental_factors
-            farm.access_to_inputs = access_to_inputs
-            farm.input_source = input_source
+            farm.soil_quality_id = soil_quality.id
+            farm.soil_type_id = soil_type.id
+            farm.irrigation_source_id = irrigation_source.id
+            farm.environmental_factor_id = environmental_factor.id
+            farm.access_to_inputs_id = access_to_input.id
+            farm.input_source_id = input_source.id
             farm.average_yield = average_yield
+
             session.commit()
 
-            st.success("Updated!")
+            st.success("Updated successfully!")
             st.rerun()
 
 # =========================
@@ -419,6 +458,31 @@ def view_farm_dialog(farm_id):
         id=farm.farmer_id
     ).first()
 
+    soil_quality = session.query(SoilQuality).filter_by(
+        id=farm.soil_quality_id
+    ).first()
+
+    soil_type = session.query(SoilType).filter_by(
+        id=farm.soil_type_id
+    ).first()
+
+    irrigation_source = session.query(IrrigationSource).filter_by(
+        id=farm.irrigation_source_id
+    ).first()
+
+    environmental_factors = session.query(EnvironmentalFactor).filter_by(
+        id=farm.environmental_factor_id
+    ).first()
+
+    access_to_inputs = session.query(AccessToInputs).filter_by(
+        id=farm.access_to_inputs_id
+    ).first()
+
+    input_source = session.query(InputSource).filter_by(
+        id=farm.input_source_id
+    ).first()
+
+
     st.markdown("### Farm Information")
 
     st.write(
@@ -427,12 +491,12 @@ def view_farm_dialog(farm_id):
     )
 
     st.write(f"**Farm Area:** {farm.farm_area}")
-    st.write(f"**Soil Quality:** {farm.soil_quality}")
-    st.write(f"**Soil Type:** {farm.soil_type}")
-    st.write(f"**Irrigation Source:** {farm.irrigation_source}")
-    st.write(f"**Environmental Factors:** {farm.environmental_factors}")
-    st.write(f"**Access to Inputs:** {farm.access_to_inputs}")
-    st.write(f"**Input Source:** {farm.input_source}")
+    st.write(f"**Soil Quality:** {soil_quality.description if soil_quality else 'N/A'}")
+    st.write(f"**Soil Type:** {soil_type.description if soil_type else 'N/A'}")
+    st.write(f"**Irrigation Source:** {irrigation_source.description if irrigation_source else 'N/A'}")
+    st.write(f"**Environmental Factors:** {environmental_factors.description if environmental_factors else 'N/A'}")
+    st.write(f"**Access to Inputs:** {access_to_inputs.description if access_to_inputs else 'N/A'}")
+    st.write(f"**Input Source:** {input_source.description if input_source else 'N/A'}")
     st.write(f"**Average Yield:** {farm.average_yield}")
 
     st.markdown("---")
@@ -456,21 +520,6 @@ with col1:
         Manage all registered farms
     </div>
     """, unsafe_allow_html=True)
-
-with col2:
-
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(
-            f"User: {st.session_state.get('user', 'Farmer')}"
-        )
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
 
 # =========================
 # TABLE ACTIONS
@@ -593,15 +642,39 @@ with upload_col:
                         skipped += 1
                         continue
 
+                    # =========================
+                    # LOOKUPS
+                    # =========================
+                    soil_quality_id = get_rf_id(SoilQuality, row["soil_quality"])
+                    soil_type_id = get_rf_id(SoilType, row["soil_type"])
+                    irrigation_source_id = get_rf_id(IrrigationSource, row["irrigation_source"])
+                    environmental_factor_id = get_rf_id(EnvironmentalFactor, row["environmental_factors"])
+                    access_to_inputs_id = get_rf_id(AccessToInputs, row["access_to_inputs"])
+                    input_source_id = get_rf_id(InputSource, row["input_source"])
+
+                    # =========================
+                    # SKIP IF REQUIRED LOOKUPS FAIL
+                    # =========================
+                    if (
+                        soil_quality_id is None
+                        or soil_type_id is None
+                        or irrigation_source_id is None
+                        or environmental_factor_id is None
+                        or access_to_inputs_id is None
+                        or input_source_id is None
+                    ):
+                        skipped += 1
+                        continue
+
                     farm = Farm(
                         farmer_id=farmer.id,
                         farm_area=float(row["farm_area"] or 0),
-                        soil_quality=str(row["soil_quality"] or ""),
-                        soil_type=str(row["soil_type"] or ""),
-                        irrigation_source=str(row["irrigation_source"] or ""),
-                        environmental_factors=str(row["environmental_factors"] or ""),
-                        access_to_inputs=str(row["access_to_inputs"] or ""),
-                        input_source=str(row["input_source"] or ""),
+                        soil_quality_id=soil_quality_id,
+                        soil_type_id=soil_type_id,
+                        irrigation_source_id=irrigation_source_id,
+                        environmental_factor_id=environmental_factor_id,
+                        access_to_inputs_id=access_to_inputs_id,
+                        input_source_id=input_source_id,
                         average_yield=float(row["average_yield"] or 0)
                     )
 
@@ -632,91 +705,219 @@ if search:
 
     search_term = f"%{search}%"
 
-    query = query.join(
-        Farmer,
-        Farmer.id == Farm.farmer_id
-    ).filter(
-        or_(
-            Farmer.firstname.ilike(search_term),
-            Farmer.lastname.ilike(search_term),
+    query = (
+        query
+        .join(Farmer, Farmer.id == Farm.farmer_id)
+        .join(SoilQuality, SoilQuality.id == Farm.soil_quality_id)
+        .join(SoilType, SoilType.id == Farm.soil_type_id)
+        .join(IrrigationSource, IrrigationSource.id == Farm.irrigation_source_id)
+        .join(EnvironmentalFactor, EnvironmentalFactor.id == Farm.environmental_factor_id)
+        .join(AccessToInputs, AccessToInputs.id == Farm.access_to_inputs_id)
+        .join(InputSource, InputSource.id == Farm.input_source_id)
+        .filter(
+            or_(
+                Farmer.firstname.ilike(search_term),
+                Farmer.lastname.ilike(search_term),
 
-            cast(Farm.farm_area, String).ilike(search_term),
-            Farm.soil_quality.ilike(search_term),
-            Farm.soil_type.ilike(search_term),
-            Farm.irrigation_source.ilike(search_term),
-            Farm.environmental_factors.ilike(search_term),
-            Farm.access_to_inputs.ilike(search_term),
-            Farm.input_source.ilike(search_term),
-            cast(Farm.average_yield, String).ilike(search_term),
+                SoilQuality.code.ilike(search_term),
+                SoilQuality.description.ilike(search_term),
+
+                SoilType.code.ilike(search_term),
+                SoilType.description.ilike(search_term),
+
+                IrrigationSource.code.ilike(search_term),
+                IrrigationSource.description.ilike(search_term),
+
+                EnvironmentalFactor.code.ilike(search_term),
+                EnvironmentalFactor.description.ilike(search_term),
+
+                AccessToInputs.code.ilike(search_term),
+                AccessToInputs.description.ilike(search_term),
+
+                InputSource.code.ilike(search_term),
+                InputSource.description.ilike(search_term),
+
+                cast(Farm.farm_area, String).ilike(search_term),
+                cast(Farm.average_yield, String).ilike(search_term),
+            )
         )
     )
 
 farms = query.all()
 
 # =========================
+# PAGINATION
+# =========================
+ROWS_PER_PAGE = 10
+
+total_rows = len(farms)
+total_pages = max((total_rows - 1) // ROWS_PER_PAGE + 1, 1)
+
+if "farm_page" not in st.session_state:
+    st.session_state.farm_page = 1
+
+# Keep current page valid
+if st.session_state.farm_page > total_pages:
+    st.session_state.farm_page = total_pages
+
+if st.session_state.farm_page < 1:
+    st.session_state.farm_page = 1
+
+start_idx = (st.session_state.farm_page - 1) * ROWS_PER_PAGE
+end_idx = start_idx + ROWS_PER_PAGE
+
+paginated_farms = farms[start_idx:end_idx]
+
+# =========================
 # TABLE
 # =========================
 with st.container(border=True):
 
-    h0, h1, h2, h3, h4, h5 = st.columns(
-        [3, 2, 2, 2, 2, 2]
-    )
+    h0, h1, h2, h3, h4, h5, h6 = st.columns(
+    [1, 3, 2, 2, 2, 2, 2]
+)
 
-    h0.markdown("<div class='table-header'>Farmer</div>", unsafe_allow_html=True)
-    h1.markdown("<div class='table-header'>Farm Area (ha)</div>", unsafe_allow_html=True)
-    h2.markdown("<div class='table-header'>Soil Type</div>", unsafe_allow_html=True)
-    h3.markdown("<div class='table-header'>Soil Quality</div>", unsafe_allow_html=True)
-    h4.markdown("<div class='table-header'>Average Yield (kg/year)</div>", unsafe_allow_html=True)
-    h5.markdown("<div class='table-header'>Actions</div>", unsafe_allow_html=True)
+    h0.markdown("<div class='table-header'>#</div>", unsafe_allow_html=True)
+    h1.markdown("<div class='table-header'>Farmer</div>", unsafe_allow_html=True)
+    h2.markdown("<div class='table-header'>Farm Area (ha)</div>", unsafe_allow_html=True)
+    h3.markdown("<div class='table-header'>Soil Type</div>", unsafe_allow_html=True)
+    h4.markdown("<div class='table-header'>Soil Quality</div>", unsafe_allow_html=True)
+    h5.markdown("<div class='table-header'>Average Yield (kg/year)</div>", unsafe_allow_html=True)
+    h6.markdown("<div class='table-header'>Actions</div>", unsafe_allow_html=True)
 
     st.divider()
 
     if not farms:
         st.info("No farms found.")
 
-    for farm in farms:
+    for i, farm in enumerate(paginated_farms, start=start_idx + 1):
 
         farmer = session.query(Farmer).filter_by(
             id=farm.farmer_id
         ).first()
 
-        c0, c1, c2, c3, c4, c5 = st.columns(
-            [3, 2, 2, 2, 2, 2]
+        soil_type = session.query(SoilType).filter_by(
+            id=farm.soil_type_id
+        ).first()
+
+        soil_quality = session.query(SoilQuality).filter_by(
+            id=farm.soil_quality_id
+        ).first()
+
+        c0, c1, c2, c3, c4, c5, c6 = st.columns(
+            [1, 3, 2, 2, 2, 2, 2]
         )
 
-        c0.write(
-            f"{farmer.firstname} {farmer.middlename[0] + '.' if farmer.middlename else ''} {farmer.lastname}"
+        c0.write(i)
+
+        c1.write(
+            f"{farmer.firstname} "
+            f"{farmer.middlename[0] + '.' if farmer.middlename else ''} "
+            f"{farmer.lastname}"
         )
 
-        c1.write(f"{farm.farm_area}")
-        c2.write(f"{farm.soil_type}")
-        c3.write(f"{farm.soil_quality}")
-        c4.write(f"{farm.average_yield}")
+        c2.write(f"{farm.farm_area}")
+        c3.write(f"{soil_type.description}")
+        c4.write(f"{soil_quality.description}")
+        c5.write(f"{farm.average_yield}")
 
-        with c5:
+        with c6:
 
             b1, b2, b3 = st.columns(3)
 
             with b1:
-                st.markdown('<div class="view-btn">', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="view-btn">',
+                    unsafe_allow_html=True
+                )
 
-                if st.button("👁", key=f"view_{farm.id}"):
+                if st.button(
+                    "👁",
+                    key=f"view_{farm.id}"
+                ):
                     view_farm_dialog(farm.id)
 
-                st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown(
+                    '</div>',
+                    unsafe_allow_html=True
+                )
 
             with b2:
-                st.markdown('<div class="edit-btn">', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="edit-btn">',
+                    unsafe_allow_html=True
+                )
 
-                if st.button("✏", key=f"edit_{farm.id}"):
+                if st.button(
+                    "✏",
+                    key=f"edit_{farm.id}"
+                ):
                     edit_farm_dialog(farm.id)
 
-                st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown(
+                    '</div>',
+                    unsafe_allow_html=True
+                )
 
             with b3:
-                st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
+                if has_permission("delete"):
 
-                if st.button("🗑", key=f"delete_{farm.id}"):
-                    delete_farm_dialog(farm.id)
+                    st.markdown(
+                        '<div class="delete-btn">',
+                        unsafe_allow_html=True
+                    )
 
-                st.markdown('</div>', unsafe_allow_html=True)
+                    if st.button(
+                        "🗑",
+                        key=f"delete_{farm.id}"
+                    ):
+                        delete_farm_dialog(farm.id)
+
+                    st.markdown(
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+
+# =========================
+# PAGINATION CONTROLS
+# =========================
+if total_rows > 0:
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    p1, p2, p3 = st.columns([.04, .08, .9])
+
+    with p1:
+        if st.button(
+            "⬅",
+            disabled=st.session_state.farm_page == 1,
+            use_container_width=False
+        ):
+            st.session_state.farm_page -= 1
+            st.rerun()
+
+    with p2:
+        st.markdown(
+            f"""
+            <div style="
+                font-size:12px;
+                color:gray;
+                text-align:left;
+                padding-top:6px;
+            ">
+                Page <b>{st.session_state.farm_page}</b> / {total_pages}
+                &nbsp;|&nbsp;
+                {start_idx + 1}-{min(end_idx, total_rows)} of {total_rows}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with p3:
+        if st.button(
+            "➡",
+            disabled=st.session_state.farm_page == total_pages,
+            use_container_width=False
+        ):
+            st.session_state.farm_page += 1
+            st.rerun()

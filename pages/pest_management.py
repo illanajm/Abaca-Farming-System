@@ -1,7 +1,12 @@
 import streamlit as st
 from sqlalchemy import or_, func
-from database import session, AbacaCultivation, PestManagement, Farm, Farmer
+from database import session, AbacaCultivation, PestManagement, Farm, Farmer, Variety, PestType, PestImpact, ControlMethod, ControlFrequency
 import pandas as pd
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
+from auth import has_permission
 
 # =========================
 # PAGE CONFIG
@@ -10,6 +15,11 @@ st.set_page_config(
     page_title="Pest Management",
     layout="wide"
 )
+
+hide_streamlit_ui()
+render_sidebar() # Render custom sidebar with navigation links
+apply_global_css() # Apply global CSS for consistent styling
+render_header() # Render consistent header across pages
 
 # =========================
 # CUSTOM CSS
@@ -23,60 +33,12 @@ st.markdown("""
 }
 
 /* =========================
-   SIDEBAR
-========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;
-    width: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* SIDEBAR BUTTONS */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-/* =========================
-   LOGO AREA
-========================= */
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
-
-/* =========================
    PAGE TITLE
 ========================= */
 .page-title {
     font-size: 37px;
     font-weight: 800;
     color: #006622;
-    text-align: center;
 }
 
 .page-subtitle {
@@ -193,35 +155,29 @@ if not st.session_state.get("logged_in"):
     st.warning("Login first")
     st.switch_page("app.py")
 
-# =========================
-# SIDEBAR
-# =========================
-with st.sidebar:
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+def rf_select(label, model):
+    options = session.query(model).all()
 
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
+    mapping = {
+        f"{o.code} - {o.description}": o.id
+        for o in options
+    }
 
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
+    selected = st.selectbox(label, list(mapping.keys()))
+    return mapping[selected]
 
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown("---")
+def get_rf_id(model, value):
+    if not value:
+        return None
 
-    st.page_link("pages/dashboard.py", label="🏠 Dashboard")
-    st.page_link("pages/farmers.py", label="👨‍🌾 Farmers")
-    st.page_link("pages/farms.py", label="🌱 Farms")
-    st.page_link("pages/cultivation.py", label="🌾 Cultivation")
-    st.page_link("pages/pest_management.py", label="🐛 Pest Management")
-    st.page_link("pages/soil_management.py", label="🧪 Soil Management")
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
+    obj = session.query(model).filter(
+        model.description.ilike(str(value).strip())
+    ).first()
+
+    return obj.id if obj else None
+
 
 # =========================
 # ADD DIALOG
@@ -230,34 +186,74 @@ with st.sidebar:
 def add_pest_dialog():
     farms = session.query(Farm).all()
     farmers = session.query(Farmer).all()
+    cultivations = session.query(AbacaCultivation).all()
+    varieties = session.query(Variety).all()
+    pest_types = session.query(PestType).all()
+    pest_impacts = session.query(PestImpact).all()
+    control_methods = session.query(ControlMethod).all()
+    control_frequencies = session.query(ControlFrequency).all()
 
-    farm_map = {
-        f.id: f for f in farms
-    }
+    # Farm map
+    farm_map = {f.id: f for f in farms}
 
+    # Farmer map
     farmer_map = {
         f.id: f"{f.firstname} {f.middlename[0] + '.' if f.middlename else ''} {f.lastname}"
         for f in farmers
     }
 
-    cultivations = session.query(AbacaCultivation).all()
+    variety_map = {
+        v.id: v.description  # or v.name if that's your field
+        for v in varieties
+    }
+
+    cultivation_map = {}
+
+    for c in cultivations:
+        farm = farm_map.get(c.farm_id)
+
+        if farm:
+            farmer_name = farmer_map.get(farm.farmer_id, "Unknown Farmer")
+        else:
+            farmer_name = "Unknown Farmer"
+
+        variety_desc = variety_map.get(c.variety_id, "Unknown Variety")
+
+        cultivation_map[c.id] = (
+            f"{variety_desc} | Farm #{c.farm_id} | {farmer_name}"
+        )
 
     with st.form("add_pest_form"):
 
         abaca = st.selectbox(
             "Cultivation",
             cultivations,
-            format_func=lambda x: (
-                f"{x.variety} | "
-                f"Farm #{x.farm_id} | "
-                f"{farmer_map.get(farm_map.get(x.farm_id).farmer_id) if farm_map.get(x.farm_id) else 'Unknown Farmer'}"
-            )
+            format_func=lambda x: cultivation_map.get(x.id, "Unknown")
         )
 
-        pest_type = st.text_input("Pest Type")
-        pest_impact = st.text_input("Pest Impact")
-        control_method = st.text_input("Control Method")
-        control_frequency = st.text_input("Control Frequency")
+        pest_type = st.selectbox(
+            "Pest Type",
+            pest_types,
+            format_func=lambda x: f"{x.code} - {x.description}" 
+        )
+
+        pest_impact = st.selectbox(
+            "Pest Impact",
+            pest_impacts,
+            format_func=lambda x: f"{x.code} - {x.description}" 
+        )
+
+        control_method = st.selectbox(
+            "Control Method",
+            control_methods,
+            format_func=lambda x: f"{x.code} - {x.description}" 
+        )
+
+        control_frequency = st.selectbox(
+            "Control Frequency",
+            control_frequencies,
+            format_func=lambda x: f"{x.code} - {x.description}" 
+        )
 
         submit = st.form_submit_button("Save")
 
@@ -265,10 +261,10 @@ def add_pest_dialog():
 
             pest = PestManagement(
                 abaca_id=abaca.id,
-                pest_type=pest_type,
-                pest_impact=pest_impact,
-                control_method=control_method,
-                control_frequency=control_frequency
+                pest_type_id=pest_type.id,
+                pest_impact_id=pest_impact.id,
+                control_method_id=control_method.id,
+                control_frequency_id=control_frequency.id
             )
 
             session.add(pest)
@@ -287,12 +283,17 @@ def view_pest_dialog(record_id):
         id=record_id
     ).first()
 
+    pest_type = session.query(PestType).filter_by(id=record.pest_type_id).first()
+    pest_impact = session.query(PestImpact).filter_by(id=record.pest_impact_id).first()
+    control_method = session.query(ControlMethod).filter_by(id=record.control_method_id).first()
+    control_frequency = session.query(ControlFrequency).filter_by(id=record.control_frequency_id).first()
+
     st.markdown("### Pest Information")
 
-    st.write(f"**Pest Type:** {record.pest_type}")
-    st.write(f"**Pest Impact:** {record.pest_impact}")
-    st.write(f"**Control Method:** {record.control_method}")
-    st.write(f"**Control Frequency:** {record.control_frequency}")
+    st.write(f"**Pest Type:** {pest_type.description if pest_type else 'Unknown'}")
+    st.write(f"**Pest Impact:** {pest_impact.description if pest_impact else 'Unknown'}")
+    st.write(f"**Control Method:** {control_method.description if control_method else 'Unknown'}")
+    st.write(f"**Control Frequency:** {control_frequency.description if control_frequency else 'Unknown'}")
 
     st.markdown("---")
 
@@ -305,40 +306,146 @@ def view_pest_dialog(record_id):
 @st.dialog("✏ Edit Pest Record")
 def edit_pest_dialog(record_id):
 
-    record = session.query(PestManagement).filter_by(
-        id=record_id
-    ).first()
+    record = session.get(PestManagement, record_id)
+
+    farmers = session.query(Farmer).all()
+    farms = session.query(Farm).all()
+    cultivations = session.query(AbacaCultivation).all()
+    pest_types = session.query(PestType).all()
+    pest_impacts = session.query(PestImpact).all()
+    control_methods = session.query(ControlMethod).all()
+    control_frequencies = session.query(ControlFrequency).all()
+
+    selected_cultivation = session.get(
+        AbacaCultivation, record.abaca_id
+    )
+
+    selected_pest_type = session.get(
+        PestType, record.pest_type_id
+    )
+
+    selected_pest_impact = session.get(
+        PestImpact, record.pest_impact_id
+    )
+
+    selected_control_method = session.get(
+        ControlMethod, record.control_method_id
+    )
+
+    selected_control_frequency = session.get(
+        ControlFrequency, record.control_frequency_id
+    )
+
+    farmer_map = {
+        f.id: f
+        for f in farmers
+    }
+
+    farm_map = {
+        f.id: f
+        for f in farms
+    }
+
+    cultivation_labels = {}
+
+    for cultivation in cultivations:
+
+        farm = farm_map.get(
+            cultivation.farm_id
+        )
+
+        if not farm:
+
+            cultivation_labels[cultivation.id] = (
+                f"Cultivation #{cultivation.id}"
+            )
+
+            continue
+
+
+        farmer = farmer_map.get(
+            farm.farmer_id
+        )
+
+        if not farmer:
+
+            cultivation_labels[cultivation.id] = (
+                f"Farm #{farm.id}"
+            )
+
+            continue
+
+
+        fullname = (
+            f"{farmer.firstname} "
+            f"{farmer.middlename or ''} "
+            f"{farmer.lastname}"
+        ).strip()
+
+
+        cultivation_labels[cultivation.id] = (
+            f"{fullname}"
+            f" | Farm #{farm.id}"
+            f" | Cultivation #{cultivation.id}"
+        )
 
     with st.form("edit_pest_form"):
 
-        pest_type = st.text_input(
+        cultivation = st.selectbox(
+            "Abaca Cultivation",
+            cultivations,
+            format_func=lambda x: cultivation_labels.get(
+                x.id,
+                f"Cultivation #{x.id}"
+            ),
+            index=(
+                cultivations.index(selected_cultivation)
+                if selected_cultivation in cultivations
+                else 0
+            )
+        )
+
+        pest_type = st.selectbox(
             "Pest Type",
-            value=record.pest_type
+            pest_types,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=pest_types.index(selected_pest_type)
+            if selected_pest_type in pest_types else 0
         )
 
-        pest_impact = st.text_input(
+        pest_impact = st.selectbox(
             "Pest Impact",
-            value=record.pest_impact
+            pest_impacts,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=pest_impacts.index(selected_pest_impact)
+            if selected_pest_impact in pest_impacts else 0
         )
 
-        control_method = st.text_input(
+        control_method = st.selectbox(
             "Control Method",
-            value=record.control_method
+            control_methods,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=control_methods.index(selected_control_method)
+            if selected_control_method in control_methods else 0
         )
 
-        control_frequency = st.text_input(
+        control_frequency = st.selectbox(
             "Control Frequency",
-            value=record.control_frequency
+            control_frequencies,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=control_frequencies.index(selected_control_frequency)
+            if selected_control_frequency in control_frequencies else 0
         )
 
         update = st.form_submit_button("Update")
 
         if update:
 
-            record.pest_type = pest_type
-            record.pest_impact = pest_impact
-            record.control_method = control_method
-            record.control_frequency = control_frequency
+            record.abaca_id = cultivation.id
+            record.pest_type_id = pest_type.id
+            record.pest_impact_id = pest_impact.id
+            record.control_method_id = control_method.id
+            record.control_frequency_id = control_frequency.id
 
             session.commit()
 
@@ -391,20 +498,6 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
-
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(
-            f"User: {st.session_state.get('user', 'Farmer')}"
-        )
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
 
 # =========================
 # SEARCH + ADD
@@ -539,14 +632,34 @@ with upload_col:
                         continue
 
                     # =========================
+                    # LOOKUPS
+                    # =========================
+                    pest_type_id = get_rf_id(PestType, row["pest_type"])
+                    pest_impact_id = get_rf_id(PestImpact, row["pest_impact"])
+                    control_method_id = get_rf_id(ControlMethod, row["control_method"])
+                    control_frequency_id = get_rf_id(ControlFrequency, row["control_frequency"])
+
+                    # =========================
+                    # SKIP IF REQUIRED LOOKUPS FAIL
+                    # =========================
+                    if (
+                        pest_type_id is None
+                        or pest_impact_id is None
+                        or control_method_id is None
+                        or control_frequency_id is None
+                    ):
+                        skipped += 1
+                        continue
+
+                    # =========================
                     # INSERT PEST RECORD
                     # =========================
                     pest = PestManagement(
                         abaca_id=cultivation.id,
-                        pest_type=str(row["pest_type"] or ""),
-                        pest_impact=str(row["pest_impact"] or ""),
-                        control_method=str(row["control_method"] or ""),
-                        control_frequency=str(row["control_frequency"] or "")
+                        pest_type_id=pest_type_id,
+                        pest_impact_id=pest_impact_id,
+                        control_method_id=control_method_id,
+                        control_frequency_id=control_frequency_id
                     )
 
                     session.add(pest)
@@ -575,49 +688,122 @@ if search:
 
     search_term = f"%{search}%"
 
-    query = query.filter(
-        or_(
-            PestManagement.pest_type.ilike(search_term),
-            PestManagement.pest_impact.ilike(search_term),
-            PestManagement.control_method.ilike(search_term),
-            PestManagement.control_frequency.ilike(search_term),
+    query = (
+        query
+        .join(PestType, PestType.id == PestManagement.pest_type_id)
+        .join(PestImpact, PestImpact.id == PestManagement.pest_impact_id)
+        .join(ControlMethod, ControlMethod.id == PestManagement.control_method_id)
+        .join(ControlFrequency, ControlFrequency.id == PestManagement.control_frequency_id)
+        .filter(
+            or_(
+                PestType.code.ilike(search_term),
+                PestType.description.ilike(search_term),
+
+                PestImpact.code.ilike(search_term),
+                PestImpact.description.ilike(search_term),
+
+                ControlMethod.code.ilike(search_term),
+                ControlMethod.description.ilike(search_term),
+
+                ControlFrequency.code.ilike(search_term),
+                ControlFrequency.description.ilike(search_term),
+            )
         )
     )
 
 records = query.all()
 
 # =========================
+# PAGINATION
+# =========================
+ROWS_PER_PAGE = 10
+
+total_rows = len(records)
+total_pages = max((total_rows - 1) // ROWS_PER_PAGE + 1, 1)
+
+if "pest_page" not in st.session_state:
+    st.session_state.pest_page = 1
+
+# Keep current page valid
+if st.session_state.pest_page > total_pages:
+    st.session_state.pest_page = total_pages
+
+if st.session_state.pest_page < 1:
+    st.session_state.pest_page = 1
+
+start_idx = (st.session_state.pest_page - 1) * ROWS_PER_PAGE
+end_idx = start_idx + ROWS_PER_PAGE
+
+paginated_pests = records[start_idx:end_idx]
+
+# =========================
 # TABLE
 # =========================
 with st.container(border=True):
 
-    h0, h1, h2, h3, h4 = st.columns(
-        [3, 3, 3, 2, 2]
+    h0, h1, h2, h3, h4, h5, h6 = st.columns(
+        [1, 3, 3, 3, 3, 2, 2]
     )
 
-    h0.markdown("<div class='table-header'>Pest Type</div>", unsafe_allow_html=True)
-    h1.markdown("<div class='table-header'>Impact</div>", unsafe_allow_html=True)
-    h2.markdown("<div class='table-header'>Control Method</div>", unsafe_allow_html=True)
-    h3.markdown("<div class='table-header'>Frequency</div>", unsafe_allow_html=True)
-    h4.markdown("<div class='table-header'>Actions</div>", unsafe_allow_html=True)
+    h0.markdown("<div class='table-header'>#</div>", unsafe_allow_html=True)
+    h1.markdown("<div class='table-header'>Famer</div>", unsafe_allow_html=True)
+    h2.markdown("<div class='table-header'>Pest Type</div>", unsafe_allow_html=True)
+    h3.markdown("<div class='table-header'>Impact</div>", unsafe_allow_html=True)
+    h4.markdown("<div class='table-header'>Control Method</div>", unsafe_allow_html=True)
+    h5.markdown("<div class='table-header'>Frequency</div>", unsafe_allow_html=True)
+    h6.markdown("<div class='table-header'>Actions</div>", unsafe_allow_html=True)
 
     st.divider()
 
     if not records:
         st.info("No pest records found.")
 
-    for r in records:
+    for i, r in enumerate(paginated_pests, start=start_idx + 1):
 
-        c0, c1, c2, c3, c4 = st.columns(
-            [3, 3, 3, 2, 2]
+        cultivation = session.query(AbacaCultivation).filter_by(
+            id=r.abaca_id
+        ).first()
+
+        farm = session.query(Farm).filter_by(
+            id=cultivation.farm_id
+        ).first()
+
+        farmer = session.query(Farmer).filter_by(
+            id=farm.farmer_id
+        ).first()
+
+        pest_type = session.query(PestType).filter_by(
+            id=r.pest_type_id
+        ).first()
+
+        pest_impact = session.query(PestImpact).filter_by(
+            id=r.pest_impact_id
+        ).first()
+
+        control_method = session.query(ControlMethod).filter_by(
+            id=r.control_method_id
+        ).first()
+
+        control_frequency = session.query(ControlFrequency).filter_by(
+            id=r.control_frequency_id
+        ).first()
+
+        c0, c1, c2, c3, c4, c5, c6 = st.columns(
+            [1, 3, 3, 3, 3, 2, 2]
         )
 
-        c0.write(r.pest_type)
-        c1.write(r.pest_impact)
-        c2.write(r.control_method)
-        c3.write(r.control_frequency)
+        c0.write(i)
+        c1.write(
+            f"{farmer.firstname} "
+            f"{farmer.middlename[0] + '.' if farmer.middlename else ''} "
+            f"{farmer.lastname}"
+        )
+        c2.write(pest_type.description)
+        c3.write(pest_impact.description)
+        c4.write(control_method.description)
+        c5.write(control_frequency.description)
 
-        with c4:
+        with c6:
 
             b1, b2, b3 = st.columns(
                 [1, 1, 1],
@@ -643,10 +829,54 @@ with st.container(border=True):
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with b3:
+                if has_permission("delete"):
+                    st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
 
-                st.markdown('<div class="delete-btn">', unsafe_allow_html=True)
+                    if st.button("🗑", key=f"delete_{r.id}"):
+                        delete_pest_dialog(r.id)
 
-                if st.button("🗑", key=f"delete_{r.id}"):
-                    delete_pest_dialog(r.id)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-                st.markdown('</div>', unsafe_allow_html=True)
+# =========================
+# PAGINATION CONTROLS
+# =========================
+if total_rows > 0:
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    p1, p2, p3 = st.columns([.04, .08, .9])
+
+    with p1:
+        if st.button(
+            "⬅",
+            disabled=st.session_state.pest_page == 1,
+            use_container_width=False
+        ):
+            st.session_state.pest_page -= 1
+            st.rerun()
+
+    with p2:
+        st.markdown(
+            f"""
+            <div style="
+                font-size:12px;
+                color:gray;
+                text-align:left;
+                padding-top:6px;
+            ">
+                Page <b>{st.session_state.pest_page}</b> / {total_pages}
+                &nbsp;|&nbsp;
+                {start_idx + 1}-{min(end_idx, total_rows)} of {total_rows}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with p3:
+        if st.button(
+            "➡",
+            disabled=st.session_state.pest_page == total_pages,
+            use_container_width=False
+        ):
+            st.session_state.pest_page += 1
+            st.rerun()

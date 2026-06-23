@@ -1,7 +1,12 @@
 import streamlit as st
 from sqlalchemy import or_, func
-from database import session, Farm, SoilManagement, Farmer
+from database import session, Farm, SoilManagement, Farmer, SoilTesting, TestingFrequency, SoilConservation, ConservationTechniques, SeasonalEffects
 import pandas as pd
+from utils.ui import hide_streamlit_ui
+from utils.sidebar import render_sidebar
+from utils.ui import apply_global_css
+from utils.header import render_header
+from auth import has_permission
 
 # =========================
 # PAGE CONFIG
@@ -10,6 +15,11 @@ st.set_page_config(
     page_title="Soil Management",
     layout="wide"
 )
+
+hide_streamlit_ui()
+render_sidebar() # Render custom sidebar with navigation links
+apply_global_css() # Apply global CSS for consistent styling
+render_header() # Render consistent header across pages
 
 # =========================
 # CUSTOM CSS
@@ -23,59 +33,12 @@ st.markdown("""
 }
 
 /* =========================
-   SIDEBAR
-========================= */
-[data-testid="stSidebar"] {
-    background: linear-gradient(135deg, #006622, #1f6f4a, #468767) !important;th: 270px;
-    border-right: 2px solid #ffffff20;
-}
-
-/* Hide default nav */
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: white !important;
-}
-
-/* SIDEBAR BUTTONS */
-.stButton button {
-    width: 100%;
-    border-radius: 12px !important;
-    background-color: #ffffff20 !important;
-    color: white !important;
-    border: 1px solid #ffffff30 !important;
-    height: 45px;
-    font-weight: 600;
-}
-
-/* =========================
-   LOGO AREA
-========================= */
-.logo-title {
-    color: white;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 10px;
-    text-align: center;
-}
-
-.logo-subtitle {
-    color: #d9ffd9;
-    font-size: 14px;
-    text-align: center;
-}
-
-/* =========================
    PAGE TITLE
 ========================= */
 .page-title {
     font-size: 37px;
     font-weight: 800;
     color: #006622;
-    text-align: center;
 }
 
 .page-subtitle {
@@ -207,35 +170,27 @@ if not st.session_state.get("logged_in"):
     st.warning("Login first")
     st.switch_page("app.py")
 
-# =========================
-# SIDEBAR
-# =========================
-with st.sidebar:
+def rf_select(label, model):
+    options = session.query(model).all()
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    mapping = {
+        f"{o.code} - {o.description}": o.id
+        for o in options
+    }
 
-    with col2:
-        st.image("public/logos/abaca_logo.png", width=120)
+    selected = st.selectbox(label, list(mapping.keys()))
+    return mapping[selected]
 
-    st.markdown("""
-        <div class="logo-title">
-            ABACA FARMING
-        </div>
 
-        <div class="logo-subtitle">
-            Management System
-        </div>
-    """, unsafe_allow_html=True)
+def get_rf_id(model, value):
+    if not value:
+        return None
 
-    st.markdown("---")
+    obj = session.query(model).filter(
+        model.description.ilike(str(value).strip())
+    ).first()
 
-    st.page_link("pages/dashboard.py", label="🏠 Dashboard")
-    st.page_link("pages/farmers.py", label="👨‍🌾 Farmers")
-    st.page_link("pages/farms.py", label="🌱 Farms")
-    st.page_link("pages/cultivation.py", label="🌾 Cultivation")
-    st.page_link("pages/pest_management.py", label="🐛 Pest Management")
-    st.page_link("pages/soil_management.py", label="🧪 Soil Management")
-    st.page_link("pages/reports.py", label="📊 Analytics & Reports")
+    return obj.id if obj else None
 
 # =========================
 # ADD DIALOG
@@ -243,12 +198,17 @@ with st.sidebar:
 @st.dialog("➕ Add Soil Record")
 def add_soil_dialog():
     farmers = session.query(Farmer).all()
+    farms = session.query(Farm).all()
+    soil_testings = session.query(SoilTesting).all()
+    testing_frequencies = session.query(TestingFrequency).all()
+    soil_conservations = session.query(SoilConservation).all()
+    conservation_techniques = session.query(ConservationTechniques).all()
+    seasonal_effects = session.query(SeasonalEffects).all()
 
     farmer_map = {
         f.id: f"{f.firstname} {f.middlename[0] + '.' if f.middlename else ''} {f.lastname}"
         for f in farmers
     }
-    farms = session.query(Farm).all()
 
     with st.form("add_soil_form"):
 
@@ -258,12 +218,37 @@ def add_soil_dialog():
             format_func=lambda x: f"Farm #{x.id} - {farmer_map.get(x.farmer_id, 'Unknown Farmer')}"
         )
 
-        soil_testing = st.text_input("Soil Testing")
-        testing_frequency = st.text_input("Testing Frequency")
+        soil_testing = st.selectbox(
+            "Soil Testing",
+            soil_testings,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
+        testing_frequency = st.selectbox(
+            "Testing Frequency",
+            testing_frequencies,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
         fertility_improvement = st.text_input("Fertility Improvement")
-        soil_conservation = st.text_input("Soil Conservation")
-        conservation_techniques = st.text_input("Conservation Techniques")
-        seasonal_effects = st.text_input("Seasonal Effects")
+
+        soil_conservation = st.selectbox(
+            "Soil Conservation",
+            soil_conservations,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+        
+        conservation_technique = st.selectbox(
+            "Conservation Techniques",
+            conservation_techniques,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
+
+        seasonal_effect = st.selectbox(
+            "Seasonal Effects",
+            seasonal_effects,
+            format_func=lambda x: f"{x.code} - {x.description}"
+        )
 
         submitted = st.form_submit_button("Save")
 
@@ -271,12 +256,12 @@ def add_soil_dialog():
 
             soil = SoilManagement(
                 farm_id=farm.id,
-                soil_testing=soil_testing,
-                testing_frequency=testing_frequency,
+                soil_testing_id=soil_testing.id,
+                testing_frequency_id=testing_frequency.id,
                 fertility_improvement=fertility_improvement,
-                soil_conservation=soil_conservation,
-                conservation_techniques=conservation_techniques,
-                seasonal_effects=seasonal_effects
+                soil_conservation_id=soil_conservation.id,
+                conservation_techniques_id=conservation_technique.id,
+                seasonal_effects_id=seasonal_effect.id
             )
 
             session.add(soil)
@@ -295,14 +280,34 @@ def view_soil_dialog(record_id):
         SoilManagement
     ).filter_by(id=record_id).first()
 
+    soil_testing = session.query(SoilTesting).filter_by(
+        id=record.soil_testing_id
+    ).first()
+
+    testing_frequency = session.query(TestingFrequency).filter_by(
+        id=record.testing_frequency_id
+    ).first()
+
+    soil_conservation = session.query(SoilConservation).filter_by(
+        id=record.soil_conservation_id
+    ).first()
+
+    conservation_technique = session.query(ConservationTechniques).filter_by(
+        id=record.conservation_techniques_id
+    ).first()
+
+    seasonal_effect = session.query(SeasonalEffects).filter_by(
+        id=record.seasonal_effects_id
+    ).first()
+
     st.markdown("### Soil Information")
 
-    st.write(f"**Soil Testing:** {record.soil_testing}")
-    st.write(f"**Testing Frequency:** {record.testing_frequency}")
+    st.write(f"**Soil Testing:** {soil_testing.description}")
+    st.write(f"**Testing Frequency:** {testing_frequency.description}")
     st.write(f"**Fertility Improvement:** {record.fertility_improvement}")
-    st.write(f"**Soil Conservation:** {record.soil_conservation}")
-    st.write(f"**Conservation Techniques:** {record.conservation_techniques}")
-    st.write(f"**Seasonal Effects:** {record.seasonal_effects}")
+    st.write(f"**Soil Conservation:** {soil_conservation.description}")
+    st.write(f"**Conservation Techniques:** {conservation_technique.description}")
+    st.write(f"**Seasonal Effects:** {seasonal_effect.description}")
 
     st.markdown("---")
 
@@ -319,16 +324,67 @@ def edit_soil_dialog(record_id):
         SoilManagement
     ).filter_by(id=record_id).first()
 
+    farmers = session.query(Farmer).all()
+    farms = session.query(Farm).all()
+    soil_testings = session.query(SoilTesting).all()
+    testing_frequencies = session.query(TestingFrequency).all()
+    soil_conservations = session.query(SoilConservation).all()
+    conservation_techniques = session.query(ConservationTechniques).all()
+    seasonal_effects = session.query(SeasonalEffects).all()
+
+    selected_farm = session.get(
+        Farm, record.farm_id
+    )
+
+    selected_soil_testing = session.get(
+        SoilTesting, record.soil_testing_id
+    )
+
+    selected_testing_frequency = session.get(
+        TestingFrequency, record.testing_frequency_id
+    )
+
+    selected_soil_conservation = session.get(
+        SoilConservation, record.soil_conservation_id
+    )
+
+    selected_conservation_technique = session.get(
+        ConservationTechniques, record.conservation_techniques_id
+    )
+
+    selected_seasonal_effect = session.get(
+        SeasonalEffects, record.seasonal_effects_id
+    )
+
     with st.form("edit_soil_form"):
 
-        soil_testing = st.text_input(
-            "Soil Testing",
-            value=record.soil_testing
+        farm = st.selectbox(
+            "Farm",
+            farms,
+            format_func=lambda x: (
+                f"{session.get(Farmer, x.farmer_id).firstname} "
+                f"{session.get(Farmer, x.farmer_id).middlename} "
+                f"{session.get(Farmer, x.farmer_id).lastname} "
+                f"(Farm #{x.id})"
+            ),
+            index=farms.index(selected_farm)
+            if selected_farm in farms else 0
         )
 
-        testing_frequency = st.text_input(
+        soil_testing = st.selectbox(
+            "Soil Testing",
+            soil_testings,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=soil_testings.index(selected_soil_testing)
+            if selected_soil_testing in soil_testings else 0
+        )
+
+        testing_frequency = st.selectbox(
             "Testing Frequency",
-            value=record.testing_frequency
+            testing_frequencies,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=testing_frequencies.index(selected_testing_frequency)
+            if selected_testing_frequency in testing_frequencies else 0
         )
 
         fertility_improvement = st.text_input(
@@ -336,31 +392,40 @@ def edit_soil_dialog(record_id):
             value=record.fertility_improvement
         )
 
-        soil_conservation = st.text_input(
+        soil_conservation = st.selectbox(
             "Soil Conservation",
-            value=record.soil_conservation
+            soil_conservations,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=soil_conservations.index(selected_soil_conservation)
+            if selected_soil_conservation in soil_conservations else 0
         )
 
-        conservation_techniques = st.text_input(
+        conservation_technique = st.selectbox(
             "Conservation Techniques",
-            value=record.conservation_techniques
+            conservation_techniques,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=conservation_techniques.index(selected_conservation_technique)
+            if selected_conservation_technique in conservation_techniques else 0
         )
 
-        seasonal_effects = st.text_input(
+        seasonal_effect = st.selectbox(
             "Seasonal Effects",
-            value=record.seasonal_effects
+            seasonal_effects,
+            format_func=lambda x: f"{x.code} - {x.description}",
+            index=seasonal_effects.index(selected_seasonal_effect)
+            if selected_seasonal_effect in seasonal_effects else 0
         )
 
         update = st.form_submit_button("Update")
 
         if update:
-
-            record.soil_testing = soil_testing
-            record.testing_frequency = testing_frequency
+            record.farm_id = farm.id
+            record.soil_testing_id = soil_testing.id
+            record.testing_frequency_id = testing_frequency.id
             record.fertility_improvement = fertility_improvement
-            record.soil_conservation = soil_conservation
-            record.conservation_techniques = conservation_techniques
-            record.seasonal_effects = seasonal_effects
+            record.soil_conservation_id = soil_conservation.id
+            record.conservation_techniques_id = conservation_technique.id
+            record.seasonal_effects_id = seasonal_effect.id
 
             session.commit()
 
@@ -413,20 +478,6 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
-
-    with st.popover(f"👤 {st.session_state.get('user', 'Farmer')}"):
-
-        st.markdown("### Account")
-
-        st.write(
-            f"User: {st.session_state.get('user', 'Farmer')}"
-        )
-
-        if st.button("🚪 Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop("user", None)
-            st.switch_page("app.py")
 
 # =========================
 # SEARCH + ADD
@@ -549,14 +600,36 @@ with upload_col:
                         skipped += 1
                         continue
 
+                    # =========================
+                    # LOOKUPS
+                    # =========================
+                    soil_testing_id = get_rf_id(SoilTesting, row["soil_testing"])
+                    testing_frequency_id = get_rf_id(TestingFrequency, row["testing_frequency"])
+                    soil_conservation_id = get_rf_id(SoilConservation, row["soil_conservation"])
+                    conservation_techniques_id = get_rf_id(ConservationTechniques, row["conservation_techniques"])
+                    seasonal_effects_id = get_rf_id(SeasonalEffects, row["seasonal_effects"])
+
+                    # =========================
+                    # SKIP IF REQUIRED LOOKUPS FAIL
+                    # =========================
+                    if (
+                        soil_testing_id is None
+                        or testing_frequency_id is None
+                        or soil_conservation_id is None
+                        or conservation_techniques_id is None
+                        or seasonal_effects_id is None
+                    ):
+                        skipped += 1
+                        continue
+
                     soil = SoilManagement(
                         farm_id=farm.id,
-                        soil_testing=str(row["soil_testing"] or ""),
-                        testing_frequency=str(row["testing_frequency"] or ""),
+                        soil_testing_id=soil_testing_id,
+                        testing_frequency_id=testing_frequency_id,
                         fertility_improvement=str(row["fertility_improvement"] or ""),
-                        soil_conservation=str(row["soil_conservation"] or ""),
-                        conservation_techniques=str(row["conservation_techniques"] or ""),
-                        seasonal_effects=str(row["seasonal_effects"] or "")
+                        soil_conservation_id=soil_conservation_id,
+                        conservation_techniques_id=conservation_techniques_id,
+                        seasonal_effects_id=seasonal_effects_id
                     )
 
                     session.add(soil)
@@ -597,35 +670,65 @@ if search:
 records = query.all()
 
 # =========================
+# PAGINATION
+# =========================
+ROWS_PER_PAGE = 10
+
+total_rows = len(records)
+total_pages = max((total_rows - 1) // ROWS_PER_PAGE + 1, 1)
+
+if "soil_page" not in st.session_state:
+    st.session_state.soil_page = 1
+
+# Keep current page valid
+if st.session_state.soil_page > total_pages:
+    st.session_state.soil_page = total_pages
+
+if st.session_state.soil_page < 1:
+    st.session_state.soil_page = 1
+
+start_idx = (st.session_state.soil_page - 1) * ROWS_PER_PAGE
+end_idx = start_idx + ROWS_PER_PAGE
+
+paginated_soils = records[start_idx:end_idx]
+
+# =========================
 # TABLE
 # =========================
 with st.container(border=True):
 
-    h0, h1, h2, h3, h4 = st.columns(
-        [3, 2, 2, 2, 2]
+    h0, h1, h2, h3, h4, h5, h6 = st.columns(
+        [1, 3, 3, 2, 2, 2, 2]
     )
 
-    h0.markdown(
-        "<div class='table-header'>Soil Testing</div>",
-        unsafe_allow_html=True
-    )
+    h0.markdown("<div class='table-header'>#</div>", unsafe_allow_html=True)
 
     h1.markdown(
-        "<div class='table-header'>Frequency</div>",
+        "<div class='table-header'>Farmer</div>",
         unsafe_allow_html=True
     )
 
     h2.markdown(
-        "<div class='table-header'>Conservation</div>",
+        "<div class='table-header'>Soil Testing</div>",
         unsafe_allow_html=True
     )
 
     h3.markdown(
-        "<div class='table-header'>Seasonal Effects</div>",
+        "<div class='table-header'>Frequency</div>",
         unsafe_allow_html=True
     )
 
     h4.markdown(
+        "<div class='table-header'>Conservation</div>",
+        unsafe_allow_html=True
+    )
+
+    h5.markdown(
+        "<div class='table-header'>Seasonal Effects</div>",
+        unsafe_allow_html=True
+    )
+
+    h6.markdown(
         "<div class='table-header'>Actions</div>",
         unsafe_allow_html=True
     )
@@ -635,18 +738,52 @@ with st.container(border=True):
     if not records:
         st.info("No soil records found.")
 
-    for r in records:
+    for i, r in enumerate(paginated_soils, start=start_idx + 1):
 
-        c0, c1, c2, c3, c4 = st.columns(
-            [3, 2, 2, 2, 2]
+        farm = session.query(Farm).filter_by(
+            id=r.farm_id
+        ).first()
+
+        farmer = session.query(Farmer).filter_by(
+            id=farm.farmer_id
+        ).first()
+
+        soil_testing = session.query(SoilTesting).filter_by(
+            id=r.soil_testing_id
+        ).first()
+
+        testing_frequency = session.query(TestingFrequency).filter_by(
+            id=r.testing_frequency_id
+        ).first()
+
+        soil_conservation = session.query(SoilConservation).filter_by(
+            id=r.soil_conservation_id
+        ).first()
+
+        conservation_technique = session.query(ConservationTechniques).filter_by(
+            id=r.conservation_techniques_id
+        ).first()
+
+        seasonal_effect = session.query(SeasonalEffects).filter_by(
+            id=r.seasonal_effects_id
+        ).first()
+
+        c0, c1, c2, c3, c4, c5, c6 = st.columns(
+            [1, 3, 3, 2, 2, 2, 2]
         )
 
-        c0.write(f"{r.soil_testing}")
-        c1.write(f"{r.testing_frequency}")
-        c2.write(f"{r.soil_conservation}")
-        c3.write(f"{r.seasonal_effects}")
+        c0.write(i)
+        c1.write(
+            f"{farmer.firstname} "
+            f"{farmer.middlename[0] + '.' if farmer.middlename else ''} "
+            f"{farmer.lastname}"
+        )
+        c2.write(f"{soil_testing.description}")
+        c3.write(f"{testing_frequency.description}")
+        c4.write(f"{soil_conservation.description}")
+        c5.write(f"{seasonal_effect.description}")
 
-        with c4:
+        with c6:
 
             b1, b2, b3 = st.columns(3)
 
@@ -661,6 +798,50 @@ with st.container(border=True):
                     edit_soil_dialog(r.id)
 
             with b3:
+                if has_permission("delete"):
+                    if st.button("🗑", key=f"delete_{r.id}"):
+                        delete_soil_dialog(r.id)
 
-                if st.button("🗑", key=f"delete_{r.id}"):
-                    delete_soil_dialog(r.id)
+# =========================
+# PAGINATION CONTROLS
+# =========================
+if total_rows > 0:
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    p1, p2, p3 = st.columns([.04, .08, .9])
+
+    with p1:
+        if st.button(
+            "⬅",
+            disabled=st.session_state.soil_page == 1,
+            use_container_width=False
+        ):
+            st.session_state.soil_page -= 1
+            st.rerun()
+
+    with p2:
+        st.markdown(
+            f"""
+            <div style="
+                font-size:12px;
+                color:gray;
+                text-align:left;
+                padding-top:6px;
+            ">
+                Page <b>{st.session_state.soil_page}</b> / {total_pages}
+                &nbsp;|&nbsp;
+                {start_idx + 1}-{min(end_idx, total_rows)} of {total_rows}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with p3:
+        if st.button(
+            "➡",
+            disabled=st.session_state.soil_page == total_pages,
+            use_container_width=False
+        ):
+            st.session_state.soil_page += 1
+            st.rerun()
