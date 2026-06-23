@@ -221,13 +221,13 @@ def add_soil_dialog():
         soil_testing = st.selectbox(
             "Soil Testing",
             soil_testings,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         testing_frequency = st.selectbox(
             "Testing Frequency",
             testing_frequencies,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         fertility_improvement = st.text_input("Fertility Improvement")
@@ -235,19 +235,19 @@ def add_soil_dialog():
         soil_conservation = st.selectbox(
             "Soil Conservation",
             soil_conservations,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
         
         conservation_technique = st.selectbox(
             "Conservation Techniques",
             conservation_techniques,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         seasonal_effect = st.selectbox(
             "Seasonal Effects",
             seasonal_effects,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         submitted = st.form_submit_button("Save")
@@ -374,7 +374,7 @@ def edit_soil_dialog(record_id):
         soil_testing = st.selectbox(
             "Soil Testing",
             soil_testings,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=soil_testings.index(selected_soil_testing)
             if selected_soil_testing in soil_testings else 0
         )
@@ -382,7 +382,7 @@ def edit_soil_dialog(record_id):
         testing_frequency = st.selectbox(
             "Testing Frequency",
             testing_frequencies,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=testing_frequencies.index(selected_testing_frequency)
             if selected_testing_frequency in testing_frequencies else 0
         )
@@ -395,7 +395,7 @@ def edit_soil_dialog(record_id):
         soil_conservation = st.selectbox(
             "Soil Conservation",
             soil_conservations,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=soil_conservations.index(selected_soil_conservation)
             if selected_soil_conservation in soil_conservations else 0
         )
@@ -403,7 +403,7 @@ def edit_soil_dialog(record_id):
         conservation_technique = st.selectbox(
             "Conservation Techniques",
             conservation_techniques,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=conservation_techniques.index(selected_conservation_technique)
             if selected_conservation_technique in conservation_techniques else 0
         )
@@ -411,7 +411,7 @@ def edit_soil_dialog(record_id):
         seasonal_effect = st.selectbox(
             "Seasonal Effects",
             seasonal_effects,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=seasonal_effects.index(selected_seasonal_effect)
             if selected_seasonal_effect in seasonal_effects else 0
         )

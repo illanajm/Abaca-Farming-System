@@ -60,7 +60,7 @@ def seed_irrigation_source():
     irrigation_source = [
         ("River/Stream", "River/Stream"),
         ("Rainfall", "Rainfall"),
-        ("Irrigation Canal", "Irrigation Canal"),
+        ("Irrigation System", "Irrigation System"),
         ("Deep Well", "Deep Well"),
         ("Shallow Well", "Shallow Well"),
         ("Spring", "Spring"),
@@ -78,11 +78,11 @@ def seed_irrigation_source():
 
 def seed_environmental_factor():
     environmental_factor = [
-        ("Climate Change", "Climate Change"),
-        ("Soil Degradation", "Soil Degradation"),
-        ("Pests or Insect Infestation", "Pests or Insect Infestation"),
-        ("Plant Diseases", "Plant Diseases"),
-        ("Natural Disasters", "Natural Disasters")
+        ("Climate change (e.g., changing rainfall patterns, temperature fluctuations)", "Climate change (e.g., changing rainfall patterns, temperature fluctuations)"),
+        ("Soil degradation (e.g., erosion, loss of fertility)", "Soil degradation (e.g., erosion, loss of fertility)"),
+        ("Pests or insect infestations", "Pests or insect infestations"),
+        ("Plant diseases", "Plant diseases"),
+        ("Natural disasters (e.g., floods, droughts)", "Natural disasters (e.g., floods, droughts)")
     ]
 
     for code, desc in environmental_factor:
@@ -117,7 +117,8 @@ def seed_input_source():
         ("NGO Assistance", "NGO Assistance"),
         ("Research Institution", "Research Institution"),
         ("Market/Agri Supply Store", "Market/Agri Supply Store"),
-        ("DA/LGU Program", "DA/LGU Program")
+        ("DA/LGU Program", "DA/LGU Program"),
+        ("Others", "Others")
     ]
 
     for code, desc in input_source:
@@ -145,7 +146,7 @@ def seed_variety():
 def seed_planting_method():
     planting_method = [
         ("Direct Planting", "Direct Planting"),
-        ("Nursery-Grown Seedlings", "Nursery-Grown Seedlings")
+        ("Nursery-Grown seedlings", "Nursery-Grown seedlings")
     ]
 
     for code, desc in planting_method:
@@ -157,10 +158,10 @@ def seed_planting_method():
 
 def seed_planting_distance():
     planting_distance = [
-        ("0.5 Meters", "0.5 Meters"),
-        ("2 Meters", "2 Meters"),
-        ("3 Meters", "3 Meters"),
-        ("5 Meters", "5 Meters")
+        ("0.5", "0.5"),
+        ("2", "2"),
+        ("3", "3"),
+        ("5", "5")
     ]
 
     for code, desc in planting_distance:
@@ -203,7 +204,7 @@ def seed_pest_type():
 def seed_pest_impact():
     pest_impact = [
         ("Slower Plant Growth", "Slower Plant Growth"),
-        ("Reduced Quality of Fibers", "Reduced Quality of Fibers"),
+        ("Reduced quality of fibers", "Reduced quality of fibers"),
         ("Significant Yield Loss", "Significant Yield Loss")
     ]
 
@@ -216,7 +217,7 @@ def seed_pest_impact():
 
 def seed_control_method():
     control_method = [
-        ("Organic Methods (Neem Oil, Insecticidal Soap)", "Organic Methods (Neem Oil, Insecticidal Soap)"),
+        ("Organic methods (e.g., neem oil, insecticidal soap)", "Organic methods (e.g., neem oil, insecticidal soap)"),
         ("Chemical Pesticides", "Chemical Pesticides"),
         ("Cultural Practices (e.g., Crop Rotation)", "Cultural Practices (e.g., Crop Rotation)"),
     ]
@@ -230,9 +231,10 @@ def seed_control_method():
 
 def seed_control_frequency():
     control_frequency = [
-        ("As Needed (When Pests Are Noticed)", "As Needed (When Pests Are Noticed)"),
+        ("Daily", "Daily"),
         ("Monthly", "Monthly"),
-        ("Weekly", "Weekly")
+        ("Weekly", "Weekly"),
+        ("As Needed (When Pests Are Noticed)", "As Needed (When Pests Are Noticed)")
     ]
 
     for code, desc in control_frequency:
@@ -244,9 +246,8 @@ def seed_control_frequency():
 
 def seed_soil_testing():
     soil_testing = [
-        ("Yes, annually", "Yes, annually"),
-        ("No, I do not conduct soil testing", "No, I do not conduct soil testing"),
-        ("Yes, every few year", "Yes, every few year")
+        ("Yes", "Yes"),
+        ("No", "No")
     ]
 
     for code, desc in soil_testing:
@@ -264,11 +265,13 @@ def seed_testing_frequency():
         ("Monthly", "Monthly"),
         ("Quarterly", "Quarterly"),
         ("Semi-Annual", "Semi-Annual"),
-        ("Annual", "Annual"),
+        ("Annually", "Annually"),
         ("Before Planting Season", "Before Planting Season"),
         ("After Harvest", "After Harvest"),
         ("When Problems Occur", "When Problems Occur"),
-        ("No Regular Testing", "No Regular Testing")
+        ("No Regular Testing", "No Regular Testing"),
+        ("Every Few Years", "Every Few Years"),
+        ("N/A", "N/A")
     ]
 
     for code, desc in testing_frequency:
@@ -280,9 +283,8 @@ def seed_testing_frequency():
 
 def seed_soil_conservation():
     soil_conservation = [
-        ("Daily", "Full system access"),
-        ("Staff", "Can manage records and limited actions"),
-        ("Encoder", "Data entry only")
+        ("Yes", "Yes"),
+        ("No", "No")
     ]
 
     for code, desc in soil_conservation:
@@ -298,7 +300,8 @@ def seed_conservation_techniques():
         ("Water the Soil", "Water the Soil"),
         ("Crop Rotation", "Crop Rotation"),
         ("No-till Farming", "No-till Farming"),
-        ("Cover Crops", "Cover Crops")
+        ("Cover Crops", "Cover Crops"),
+        ("N/A", "N/A")
     ]
 
     for code, desc in conservation_techniques:

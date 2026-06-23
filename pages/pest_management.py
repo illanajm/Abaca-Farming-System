@@ -234,25 +234,25 @@ def add_pest_dialog():
         pest_type = st.selectbox(
             "Pest Type",
             pest_types,
-            format_func=lambda x: f"{x.code} - {x.description}" 
+            format_func=lambda x: f"{x.description}" 
         )
 
         pest_impact = st.selectbox(
             "Pest Impact",
             pest_impacts,
-            format_func=lambda x: f"{x.code} - {x.description}" 
+            format_func=lambda x: f"{x.description}" 
         )
 
         control_method = st.selectbox(
             "Control Method",
             control_methods,
-            format_func=lambda x: f"{x.code} - {x.description}" 
+            format_func=lambda x: f"{x.description}" 
         )
 
         control_frequency = st.selectbox(
             "Control Frequency",
             control_frequencies,
-            format_func=lambda x: f"{x.code} - {x.description}" 
+            format_func=lambda x: f"{x.description}" 
         )
 
         submit = st.form_submit_button("Save")
@@ -408,7 +408,7 @@ def edit_pest_dialog(record_id):
         pest_type = st.selectbox(
             "Pest Type",
             pest_types,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=pest_types.index(selected_pest_type)
             if selected_pest_type in pest_types else 0
         )
@@ -416,7 +416,7 @@ def edit_pest_dialog(record_id):
         pest_impact = st.selectbox(
             "Pest Impact",
             pest_impacts,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=pest_impacts.index(selected_pest_impact)
             if selected_pest_impact in pest_impacts else 0
         )
@@ -424,7 +424,7 @@ def edit_pest_dialog(record_id):
         control_method = st.selectbox(
             "Control Method",
             control_methods,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=control_methods.index(selected_control_method)
             if selected_control_method in control_methods else 0
         )
@@ -432,7 +432,7 @@ def edit_pest_dialog(record_id):
         control_frequency = st.selectbox(
             "Control Frequency",
             control_frequencies,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=control_frequencies.index(selected_control_frequency)
             if selected_control_frequency in control_frequencies else 0
         )
@@ -556,6 +556,7 @@ with upload_col:
             # REQUIRED COLUMNS
             required_columns = [
                 "firstname",
+                "middlename",
                 "lastname",
                 "pest_type",
                 "pest_impact",
@@ -595,6 +596,7 @@ with upload_col:
                     status.text(f"Processing {i+1}/{total}...")
 
                     fname = str(row["firstname"]).strip()
+                    mname = str(row["middlename"]).strip()
                     lname = str(row["lastname"]).strip()
 
                     # =========================
@@ -602,6 +604,7 @@ with upload_col:
                     # =========================
                     farmer = session.query(Farmer).filter(
                         func.lower(Farmer.firstname) == fname.lower(),
+                        func.lower(Farmer.middlename) == mname.lower(),
                         func.lower(Farmer.lastname) == lname.lower()
                     ).first()
 

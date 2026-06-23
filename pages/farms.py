@@ -224,37 +224,37 @@ def add_farm_dialog():
         soil_quality = st.selectbox(
             "Soil Quality",
             soil_qualities,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         soil_type = st.selectbox(
             "Soil Type",
             soil_types,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         irrigation_source = st.selectbox(
             "Irrigation Source",
             irrigation_sources,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         environmental_factors = st.selectbox(
             "Environment Factors",
             environmental_factors,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         access_to_inputs = st.selectbox(
             "Access to Inputs",
             access_to_inputs,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
         
         input_source = st.selectbox(
             "Input Source",
             input_sources,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         average_yield = st.number_input(
@@ -347,7 +347,7 @@ def edit_farm_dialog(farm_id):
         soil_quality = st.selectbox(
             "Soil Quality",
             soil_qualities,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=soil_qualities.index(selected_soil_quality)
             if selected_soil_quality in soil_qualities else 0
         )
@@ -355,7 +355,7 @@ def edit_farm_dialog(farm_id):
         soil_type = st.selectbox(
             "Soil Type",
             soil_types,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=soil_types.index(selected_soil_type)
             if selected_soil_type in soil_types else 0
         )
@@ -363,7 +363,7 @@ def edit_farm_dialog(farm_id):
         irrigation_source = st.selectbox(
             "Irrigation Source",
             irrigation_sources,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=irrigation_sources.index(selected_irrigation_source)
             if selected_irrigation_source in irrigation_sources else 0
         )
@@ -371,7 +371,7 @@ def edit_farm_dialog(farm_id):
         environmental_factor = st.selectbox(
             "Environmental Factor",
             environmental_factors,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=environmental_factors.index(selected_environmental_factor)
             if selected_environmental_factor in environmental_factors else 0
         )
@@ -379,7 +379,7 @@ def edit_farm_dialog(farm_id):
         access_to_input = st.selectbox(
             "Access to Inputs",
             access_to_inputs,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=access_to_inputs.index(selected_access_to_inputs)
             if selected_access_to_inputs in access_to_inputs else 0
         )
@@ -387,7 +387,7 @@ def edit_farm_dialog(farm_id):
         input_source = st.selectbox(
             "Input Source",
             input_sources,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=input_sources.index(selected_input_source)
             if selected_input_source in input_sources else 0
         )

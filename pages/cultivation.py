@@ -229,19 +229,19 @@ def add_cultivation_dialog():
         variety = st.selectbox(
             "Variety",
             varieties,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         planting_distance = st.selectbox(
             "Planting Distance (meters)",
             planting_distances,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         planting_method = st.selectbox(
             "Planting Method",
             planting_methods,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         intercropping = st.selectbox(
@@ -252,7 +252,7 @@ def add_cultivation_dialog():
         intercrop_crops = st.selectbox(
             "Intercrop Crops",
             intercrops_crops,
-            format_func=lambda x: f"{x.code} - {x.description}"
+            format_func=lambda x: f"{x.description}"
         )
 
         submitted = st.form_submit_button("Save")
@@ -364,7 +364,7 @@ def edit_cultivation_dialog(record_id):
         variety = st.selectbox(
             "Variety",
             varieties,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=varieties.index(selected_variety)
             if selected_variety in varieties else 0
         )
@@ -384,7 +384,7 @@ def edit_cultivation_dialog(record_id):
         planting_distance = st.selectbox(
             "Planting Distance (meters)",
             planting_distances,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=planting_distances.index(selected_planting_distance)
             if selected_planting_distance in planting_distances else 0
         )
@@ -392,7 +392,7 @@ def edit_cultivation_dialog(record_id):
         planting_method = st.selectbox(
             "Planting Method",
             planting_methods,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=planting_methods.index(selected_planting_method)
             if selected_planting_method in planting_methods else 0
         )
@@ -406,7 +406,7 @@ def edit_cultivation_dialog(record_id):
         intercrop_crops = st.selectbox(
             "Intercrop Crops",
             intercrops_crops,
-            format_func=lambda x: f"{x.code} - {x.description}",
+            format_func=lambda x: f"{x.description}",
             index=intercrops_crops.index(selected_intercrop_crops)
             if selected_intercrop_crops in intercrops_crops else 0
         )
