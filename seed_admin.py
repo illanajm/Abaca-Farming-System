@@ -1,6 +1,10 @@
 from database import session
 from database import User, UserRole, Permission, RolePermission
-from pages.users import hash_password
+import bcrypt
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def seed_roles():
     roles = [
@@ -74,13 +78,15 @@ def create_admin():
         print("Admin already exists")
         return
 
+    admin_role = session.query(UserRole).filter_by(code="Admin").first()
+
     admin_user = User(
         firstname="Super",
         middlename="",
         lastname="Admin",
         username="superadmin",
         password=hash_password("admin123"),
-        role_id=1  # Assuming the Admin role has ID 1
+        role_id=admin_role.id
     )
 
     session.add(admin_user)
