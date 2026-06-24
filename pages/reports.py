@@ -53,7 +53,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 # =========================
-# PAGE CONFIG
+# PAGE CONFIG Changes
 # =========================
 st.set_page_config(
     page_title="Analytics & Reports",
