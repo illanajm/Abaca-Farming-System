@@ -637,7 +637,11 @@ with upload_col:
                     # =========================
                     # LOOKUPS
                     # =========================
-                    pest_type_id = get_rf_id(PestType, row["pest_type"])
+                    pest_types = [
+                        p.strip()
+                        for p in str(row["pest_type"]).split(",")
+                        if p.strip()
+                    ]
                     pest_impact_id = get_rf_id(PestImpact, row["pest_impact"])
                     control_method_id = get_rf_id(ControlMethod, row["control_method"])
                     control_frequency_id = get_rf_id(ControlFrequency, row["control_frequency"])
@@ -646,27 +650,31 @@ with upload_col:
                     # SKIP IF REQUIRED LOOKUPS FAIL
                     # =========================
                     if (
-                        pest_type_id is None
-                        or pest_impact_id is None
+                        pest_impact_id is None
                         or control_method_id is None
                         or control_frequency_id is None
                     ):
                         skipped += 1
                         continue
 
-                    # =========================
-                    # INSERT PEST RECORD
-                    # =========================
-                    pest = PestManagement(
-                        abaca_id=cultivation.id,
-                        pest_type_id=pest_type_id,
-                        pest_impact_id=pest_impact_id,
-                        control_method_id=control_method_id,
-                        control_frequency_id=control_frequency_id
-                    )
+                    # Create one record per pest type
+                    for pest_name in pest_types:
 
-                    session.add(pest)
-                    inserted += 1
+                        pest_type_id = get_rf_id(PestType, pest_name)
+
+                        if pest_type_id is None:
+                            continue
+
+                        pest = PestManagement(
+                            abaca_id=cultivation.id,
+                            pest_type_id=pest_type_id,
+                            pest_impact_id=pest_impact_id,
+                            control_method_id=control_method_id,
+                            control_frequency_id=control_frequency_id
+                        )
+
+                        session.add(pest)
+                        inserted += 1
 
                 except Exception as e:
                     skipped += 1

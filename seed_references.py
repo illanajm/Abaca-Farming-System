@@ -78,11 +78,11 @@ def seed_irrigation_source():
 
 def seed_environmental_factor():
     environmental_factor = [
-        ("Climate change (e.g., changing rainfall patterns, temperature fluctuations)", "Climate change (e.g., changing rainfall patterns, temperature fluctuations)"),
-        ("Soil degradation (e.g., erosion, loss of fertility)", "Soil degradation (e.g., erosion, loss of fertility)"),
-        ("Pests or insect infestations", "Pests or insect infestations"),
-        ("Plant diseases", "Plant diseases"),
-        ("Natural disasters (e.g., floods, droughts)", "Natural disasters (e.g., floods, droughts)")
+        ("Climate Change", "Climate Change"),
+        ("Soil Degradation", "Soil Degradation"),
+        ("Pest Infestations", "Pest Infestations"),
+        ("Natural Disasters", "Natural Disasters"),
+        ("Plant diseases", "Plant diseases")
     ]
 
     for code, desc in environmental_factor:
@@ -94,10 +94,8 @@ def seed_environmental_factor():
 
 def seed_access_to_input():
     access_to_input = [
-        ("Yes, through local suppliers", "Yes, through local suppliers"),
-        ("Yes, through cooperatives or farmer groups", "Yes, through cooperatives or farmer groups"),
-        ("Yes, through direct purchase from agricultural companies", "Yes, through direct purchase from agricultural companies"),
-        ("No, the farm does not have access to agricultural inputs", "No, the farm does not have access to agricultural inputs")
+        ("Yes", "Yes"),
+        ("No", "No")
     ]
 
     for code, desc in access_to_input:
@@ -118,7 +116,11 @@ def seed_input_source():
         ("Research Institution", "Research Institution"),
         ("Market/Agri Supply Store", "Market/Agri Supply Store"),
         ("DA/LGU Program", "DA/LGU Program"),
-        ("Others", "Others")
+        ("Agricultural Companies", "Agricultural Companies"),
+        ("Farmer Groups", "Farmer Groups"),
+        ("Local Suppliers", "Local Suppliers"),
+        ("Others", "Others"),
+        ("No Input Source", "No Input Source")
     ]
 
     for code, desc in input_source:
@@ -158,10 +160,10 @@ def seed_planting_method():
 
 def seed_planting_distance():
     planting_distance = [
-        ("0.5", "0.5"),
-        ("2", "2"),
-        ("3", "3"),
-        ("5", "5")
+        ("0.5 m", "0.5 m"),
+        ("2 m", "2 m"),
+        ("3 m", "3 m"),
+        ("5 m", "5 m")
     ]
 
     for code, desc in planting_distance:
@@ -177,7 +179,7 @@ def seed_intercrop_crops():
         ("Peanut", "Peanut"),
         ("Cacao", "Cacao"),
         ("Casava", "Casava"),
-        ("None", "None")
+        ("No Crops", "No Crops")
     ]
 
     for code, desc in intercrop_crops:
