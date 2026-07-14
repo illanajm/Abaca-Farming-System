@@ -438,12 +438,16 @@ def edit_soil_dialog(record_id):
 @st.dialog("⚠️ Confirm Delete")
 def delete_soil_dialog(record_id):
 
-    record = session.query(
-        SoilManagement
-    ).filter_by(id=record_id).first()
+    record = session.get(SoilManagement, record_id)
+
+    farm = session.get(Farm, record.farm_id)
+    farmer = session.get(Farmer, farm.farmer_id)
+    soil_testing = session.get(SoilTesting, record.soil_testing_id)
 
     st.warning(
-        f"Delete '{record.soil_testing}'?"
+        f"Delete soil management record for "
+        f"{farmer.firstname} {farmer.lastname} "
+        f"({soil_testing.description})?"
     )
 
     col1, col2 = st.columns(2)

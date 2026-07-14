@@ -458,12 +458,17 @@ def edit_pest_dialog(record_id):
 @st.dialog("⚠️ Confirm Delete")
 def delete_pest_dialog(record_id):
 
-    record = session.query(PestManagement).filter_by(
-        id=record_id
-    ).first()
+    record = session.get(PestManagement, record_id)
+
+    abaca = session.get(AbacaCultivation, record.abaca_id)
+    farm = session.get(Farm, abaca.farm_id)
+    farmer = session.get(Farmer, farm.farmer_id)
+    pest_type = session.get(PestType, record.pest_type_id)
 
     st.warning(
-        f"Delete '{record.pest_type}'?"
+        f"Delete pest management record for "
+        f"{farmer.firstname} {farmer.lastname} "
+        f"({pest_type.description})?"
     )
 
     col1, col2 = st.columns(2)

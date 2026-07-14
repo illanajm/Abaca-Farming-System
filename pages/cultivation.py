@@ -434,12 +434,16 @@ def edit_cultivation_dialog(record_id):
 @st.dialog("⚠️ Confirm Delete")
 def delete_cultivation_dialog(record_id):
 
-    record = session.query(
-        AbacaCultivation
-    ).filter_by(id=record_id).first()
+    record = session.get(AbacaCultivation, record_id)
+
+    farm = session.get(Farm, record.farm_id)
+    farmer = session.get(Farmer, farm.farmer_id)
+    variety = session.get(Variety, record.variety_id)
 
     st.warning(
-        f"Delete '{record.variety}'?"
+        f"Delete cultivation record for "
+        f"{farmer.firstname} {farmer.lastname} "
+        f"({variety.description})?"
     )
 
     col1, col2 = st.columns(2)

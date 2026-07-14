@@ -32,6 +32,13 @@ if not st.session_state.logged_in:
     st.warning("Please login first.")
     st.switch_page("app.py")
 
+
+# =========================
+# FLASH SUCCESS MESSAGE
+# =========================
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
+
 # =========================
 # CUSTOM CSS
 # =========================
@@ -259,7 +266,7 @@ def add_farmer_dialog():
             session.add(farmer)
             session.commit()
 
-            st.success("Farmer added!")
+            st.session_state.success_message = "Farmer added successfully!"
             st.rerun()
 
 # =========================
@@ -390,7 +397,7 @@ def edit_farmer_dialog(farmer_id):
 
             session.commit()
 
-            st.success("Updated!")
+            st.session_state.success_message = "Farmer updated successfully!"
             st.rerun()
 
 # =========================
@@ -419,7 +426,8 @@ def delete_farmer_dialog(farmer_id):
         if st.button("🗑 Yes, Delete"):
             session.delete(farmer)
             session.commit()
-            st.success("Farmer deleted!")
+
+            st.session_state.success_message = "Farmer deleted successfully!"
             st.rerun()
 
 # =========================

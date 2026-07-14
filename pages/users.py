@@ -127,16 +127,52 @@ if st.button("Update Role"):
 st.divider()
 st.subheader("Delete User")
 
-delete_user = st.selectbox("Select User to Delete", list(user_map.keys()), key="delete")
+delete_user = st.selectbox(
+    "Select User to Delete",
+    list(user_map.keys()),
+    key="delete"
+)
 
 if st.button("Delete User"):
-    user = session.query(User).filter_by(id=user_map[delete_user]).first()
+
+    user = session.query(User).filter_by(
+        id=user_map[delete_user]
+    ).first()
 
     if user:
+
+        # Prevent deleting the last Admin
+        admin_role = session.query(UserRole).filter_by(code="Admin").first()
+
+        if admin_role and user.role_id == admin_role.id:
+
+            admin_count = session.query(User).filter_by(
+                role_id=admin_role.id
+            ).count()
+
+            if admin_count <= 1:
+                st.error(
+                    "Cannot delete this user. At least one Admin account must remain."
+                )
+                st.stop()
+
+        # Check if the deleted account is the currently logged-in user
+        is_current_user = (
+            st.session_state.get("user_id") == user.id
+        )
+
+        # Delete user
         session.delete(user)
         session.commit()
-        st.success("User deleted successfully")
-        st.rerun()
+
+        if is_current_user:
+            # Clear session and logout
+            st.session_state.clear()
+            st.success("Your account has been deleted.")
+            st.switch_page("app.py")      # or st.rerun() if your login page checks logged_in
+        else:
+            st.success("User deleted successfully.")
+            st.rerun()
 
 # =========================
 # ROLE → PERMISSION MANAGEMENT
