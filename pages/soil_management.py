@@ -170,6 +170,12 @@ if not st.session_state.get("logged_in"):
     st.warning("Login first")
     st.switch_page("app.py")
 
+# =========================
+# FLASH SUCCESS MESSAGE
+# =========================
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
+
 def rf_select(label, model):
     options = session.query(model).all()
 
@@ -267,7 +273,7 @@ def add_soil_dialog():
             session.add(soil)
             session.commit()
 
-            st.success("Added successfully!")
+            st.session_state.success_message = "Soil record added successfully!"
             st.rerun()
 
 # =========================
@@ -429,7 +435,7 @@ def edit_soil_dialog(record_id):
 
             session.commit()
 
-            st.success("Updated successfully!")
+            st.session_state.success_message = "Soil record updated successfully!"
             st.rerun()
 
 # =========================
@@ -462,7 +468,7 @@ def delete_soil_dialog(record_id):
             session.delete(record)
             session.commit()
 
-            st.success("Deleted!")
+            st.session_state.success_message = "Soil record deleted!"
             st.rerun()
 
 # =========================

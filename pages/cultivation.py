@@ -165,6 +165,12 @@ if not st.session_state.get("logged_in"):
     st.warning("Login first")
     st.switch_page("app.py")
 
+# =========================
+# FLASH SUCCESS MESSAGE
+# =========================
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
+
 
 def rf_select(label, model):
     options = session.query(model).all()
@@ -273,7 +279,7 @@ def add_cultivation_dialog():
             session.add(record)
             session.commit()
 
-            st.success("Added successfully!")
+            st.session_state.success_message = "Cultivation added successfully!"
             st.rerun()
 
 # =========================
@@ -425,7 +431,7 @@ def edit_cultivation_dialog(record_id):
 
             session.commit()
 
-            st.success("Updated!")
+            st.session_state.success_message = "Cultivation updated successfully!"
             st.rerun()
 
 # =========================
@@ -458,7 +464,7 @@ def delete_cultivation_dialog(record_id):
             session.delete(record)
             session.commit()
 
-            st.success("Deleted!")
+            st.session_state.success_message = "Cultivation deleted!"
             st.rerun()
 
 # =========================

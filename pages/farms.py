@@ -171,6 +171,13 @@ if not st.session_state.logged_in:
     st.switch_page("app.py")
 
 
+# =========================
+# FLASH SUCCESS MESSAGE
+# =========================
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
+
+
 def rf_select(label, model):
     options = session.query(model).all()
 
@@ -281,7 +288,7 @@ def add_farm_dialog():
             session.add(farm)
             session.commit()
 
-            st.success("Farm added!")
+            st.session_state.success_message = "Farm added successfully!"
             st.rerun()
 
 # =========================
@@ -412,7 +419,7 @@ def edit_farm_dialog(farm_id):
 
             session.commit()
 
-            st.success("Updated successfully!")
+            st.session_state.success_message = "Farm updated successfully!"
             st.rerun()
 
 # =========================
@@ -443,7 +450,7 @@ def delete_farm_dialog(farm_id):
             session.delete(farm)
             session.commit()
 
-            st.success("Farm deleted!")
+            st.session_state.success_message = "Farm deleted!"
             st.rerun()
 
 # =========================
